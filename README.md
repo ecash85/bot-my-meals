@@ -69,7 +69,8 @@ This is the easy default for anyone. Cloudflare dashboard → connect GitHub to 
 | Build command | `npm run build:worker` |
 | Deploy command | `node scripts/cf-deploy.mjs` |
 | Non-production branch deploy command | `npm run deploy:preview` |
-| Build watch paths — Include | `src/*, public/*, scripts/*, package.json, package-lock.json, .npmrc, wrangler.jsonc` |
+| Build watch paths — Include | `src/*, public/*, scripts/*, package.json, package-lock.json, .npmrc, wrangler.jsonc, open-next.config.ts, next.config.ts` |
+| Build watch paths — Exclude | (leave empty, or exclude docs-only paths if you prefer) |
 
 `npm run build:worker` (not bare `npx opennextjs-cloudflare build`) and `npm run deploy` (root or this repo) still target Worker **`bot-my-meals`**. `scripts/cf-deploy.mjs` promotes on `main` and uploads preview versions on other branches. If the Cloudflare dashboard still has the old build command `npx opennextjs-cloudflare build`, change it to `npm run build:worker`. That is a **command** update, not a hostname/DNS change.
 
@@ -289,7 +290,7 @@ npm run deploy
 | Job | Where | When |
 | --- | --- | --- |
 | Checks | GitHub Actions [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Every pull request, every push to `main`, and `workflow_call` |
-| Production deploy (household) | Cloudflare **Workers Builds** | `main` changes under `src/**` (or `scripts/**` / root lockfile) → Worker **`bot-my-meals`**. Build `npm run build:worker`. Deploy `node scripts/cf-deploy.mjs`. After cutover phones use https://bot-my-meals.<your-subdomain>.workers.dev ([`docs/domains.md`](docs/domains.md)). |
+| Production deploy (household) | Cloudflare **Workers Builds** | `main` changes matching the watch paths in [`docs/workers-builds.md`](docs/workers-builds.md) (`src/*`, `public/*`, `scripts/*`, `package.json`, `package-lock.json`, `.npmrc`, `wrangler.jsonc`, `open-next.config.ts`, `next.config.ts`) → Worker **`bot-my-meals`**. Build `npm run build:worker`. Deploy `node scripts/cf-deploy.mjs`. After cutover phones use https://bot-my-meals.<your-subdomain>.workers.dev ([`docs/domains.md`](docs/domains.md)). |
 
 Actions runs `npm ci`, `npm test`, `npm run lint`, and `npm run build:worker`. The OpenNext smoke build does **not** need Cloudflare credentials. Actions does **not** deploy. Keep the Cloudflare API token out of this repo and out of GitHub unless you later retire Workers Builds and switch deploy to Actions on purpose.
 
@@ -302,8 +303,8 @@ Required GitHub secrets for an Actions deploy (not used today): `CLOUDFLARE_API_
 2. **Settings → Builds → Connect** (skip Connect if Git is already linked; still fix commands + watch paths).
 3. If prompted, install / authorize the **Cloudflare Workers and Pages** GitHub App on your GitHub account. Limit it to **your** fork or template copy of this repo.
 4. Select **your** fork or template copy of this repo.
-6. **Settings → Builds → Branch control**: production branch `main`. Check **Builds for non-production branches** if you want PR preview URLs and Cloudflare PR comments.
-8. Save. The next matching push (or merge) to `main` should build and go live. Watch-path skips apply after you save.
+5. **Settings → Builds → Branch control**: production branch `main`. Check **Builds for non-production branches** if you want PR preview URLs and Cloudflare PR comments.
+6. Save. The next matching push (or merge) to `main` should build and go live. Watch-path skips apply after you save.
 
 
 Optional on GitHub: **Settings → Branches** → protect `main` and require the **CI / Test** check before merge.
@@ -319,4 +320,8 @@ Eaters can belong to the household later without voting. Only owner and voter ro
 The app ships a web manifest, service worker (offline shell), apple-touch icon, standalone display, and `viewport-fit=cover` safe areas. On iPhone Safari: Share → Add to Home Screen. You can install as soon as the HTTPS URL works; you do not need a household first.
 
 ## Tests
+
+`npm test` runs Vitest once (`vitest run`). Specs are `src/**/*.test.ts` and run in Node (`vitest.config.ts`). There is no coverage script.
+
+GitHub Actions runs `npm ci`, then `npm test`, `npm run lint`, and `npm run build:worker` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
