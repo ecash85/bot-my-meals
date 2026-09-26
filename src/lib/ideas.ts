@@ -1,0 +1,101 @@
+import type { ReplacementIdea } from "./types";
+
+export const REPLACEMENT_IDEAS: ReplacementIdea[] = [
+  {
+    id: "tacos",
+    title: "Weeknight tacos",
+    pitch: "Seasoned beef, warm tortillas, and a pile of toppings.",
+    prepMinutes: 30,
+    audience: "family",
+    steps: [
+      "Warm a skillet and brown the ground beef until no pink remains.",
+      "Stir in taco seasoning and a splash of water. Simmer 3 minutes.",
+      "Warm tortillas in a dry pan.",
+      "Set out lettuce, salsa, cheese, and sour cream and let everyone build their own.",
+    ],
+    ingredients: [
+      { name: "Ground beef", quantity: 1.5, unit: "lb", storeSlug: "smiths" },
+      { name: "Taco seasoning", quantity: 1, unit: "packet", storeSlug: "smiths" },
+      { name: "Flour tortillas", quantity: 12, unit: "ct", storeSlug: "trader-joes" },
+      { name: "Shredded Mexican cheese", quantity: 8, unit: "oz", storeSlug: "trader-joes" },
+      { name: "Salsa", quantity: 1, unit: "jar", storeSlug: "trader-joes" },
+      { name: "Romaine lettuce", quantity: 1, unit: "head", storeSlug: "smiths" },
+    ],
+  },
+  {
+    id: "breakfast-dinner",
+    title: "Breakfast for dinner",
+    pitch: "Eggs, bacon, toast. Done before anyone gets restless.",
+    prepMinutes: 20,
+    audience: "family",
+    steps: [
+      "Cook bacon in a sheet pan at 400°F until crisp, about 15 minutes.",
+      "Toast the bread.",
+      "Fry or scramble eggs in the bacon drippings or butter.",
+      "Serve with fruit if you have it.",
+    ],
+    ingredients: [
+      { name: "Eggs", quantity: 8, unit: "ct", storeSlug: "smiths" },
+      { name: "Bacon", quantity: 1, unit: "lb", storeSlug: "smiths" },
+      { name: "Sourdough bread", quantity: 1, unit: "loaf", storeSlug: "trader-joes" },
+      { name: "Butter", quantity: 4, unit: "tbsp", storeSlug: "trader-joes" },
+    ],
+  },
+  {
+    id: "soup-grilled-cheese",
+    title: "Tomato soup and grilled cheese",
+    pitch: "Rainy-night food even when Las Vegas is not raining.",
+    prepMinutes: 25,
+    audience: "family",
+    steps: [
+      "Heat the tomato soup with a splash of milk until steaming.",
+      "Butter the bread and build cheddar sandwiches.",
+      "Griddle until both sides are golden and the cheese melts.",
+    ],
+    ingredients: [
+      { name: "Tomato soup", quantity: 2, unit: "cans", storeSlug: "smiths" },
+      { name: "Sourdough bread", quantity: 1, unit: "loaf", storeSlug: "trader-joes" },
+      { name: "Sharp cheddar", quantity: 8, unit: "oz", storeSlug: "trader-joes" },
+      { name: "Butter", quantity: 3, unit: "tbsp", storeSlug: "trader-joes" },
+    ],
+  },
+  {
+    id: "stir-fry",
+    title: "Ginger chicken stir-fry",
+    pitch: "Hot pan, leftover rice, dinner in one skillet.",
+    prepMinutes: 25,
+    audience: "family",
+    steps: [
+      "Slice chicken thin and toss with soy sauce and cornstarch.",
+      "Stir-fry chicken in a hot skillet until just cooked. Set aside.",
+      "Stir-fry frozen vegetables until hot.",
+      "Return chicken, add a splash more soy, and serve over rice.",
+    ],
+    ingredients: [
+      { name: "Chicken thighs", quantity: 1.5, unit: "lb", storeSlug: "smiths" },
+      { name: "Frozen stir-fry vegetables", quantity: 1, unit: "bag", storeSlug: "trader-joes" },
+      { name: "Jasmine rice", quantity: 2, unit: "cups", storeSlug: "trader-joes" },
+      { name: "Soy sauce", quantity: 0.25, unit: "cup", storeSlug: "trader-joes" },
+    ],
+  },
+  {
+    id: "risotto",
+    title: "Mushroom risotto",
+    pitch: "A slower Saturday pot of rice, butter, and Parmesan.",
+    prepMinutes: 45,
+    audience: "couple",
+    steps: [
+      "Warm the broth in a small pot.",
+      "Sauté mushrooms in butter until browned. Set aside.",
+      "Toast the rice in the same pot, then add broth a ladle at a time, stirring.",
+      "Fold mushrooms and Parmesan back in. Season and serve.",
+    ],
+    ingredients: [
+      { name: "Arborio rice", quantity: 1, unit: "cup", storeSlug: "trader-joes" },
+      { name: "Cremini mushrooms", quantity: 8, unit: "oz", storeSlug: "trader-joes" },
+      { name: "Vegetable broth", quantity: 4, unit: "cups", storeSlug: "trader-joes" },
+      { name: "Parmesan", quantity: 2, unit: "oz", storeSlug: "trader-joes" },
+      { name: "Butter", quantity: 3, unit: "tbsp", storeSlug: "trader-joes" },
+    ],
+  },
+];

@@ -1,0 +1,46 @@
+{
+  "name": "bot-my-meals",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot My Meals \u2014 dual-approve household dinner PWA (vote \u2192 lock \u2192 recipes + shopping list)",
+  "scripts": {
+    "dev": "next dev -p 43147 -H 0.0.0.0",
+    "prebuild": "node scripts/write-pwa-icons.mjs",
+    "build": "next build",
+    "start": "next start -p 43147 -H 0.0.0.0",
+    "lint": "eslint",
+    "test": "vitest run",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "build:worker": "opennextjs-cloudflare build",
+    "deploy": "opennextjs-cloudflare build && node scripts/cf-deploy.mjs",
+    "deploy:preview": "wrangler versions upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.113.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.39.0",
+    "next": "16.3.4",
+    "radix-ui": "^1.6.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "shadcn": "^4.19.1",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.130.0"
+  }
+}

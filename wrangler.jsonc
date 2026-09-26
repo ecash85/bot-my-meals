@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Household PWA. Worker name stays `bot-my-meals`. Do not rename.
+  //
+  // DIY: attach YOUR workers.dev URL or YOUR custom domain in the Cloudflare
+  // dashboard. Do not uncomment `routes` here — `wrangler deploy` with
+  // custom_domain: true creates DNS. Runbook: docs/domains.md
+  //
+  // "routes": [
+  //   { "pattern": "meals.example.com", "custom_domain": true }
+  // ]
+  //
+  // Do not use {handle}.botmymeals.com — that is not a DIY hostname.
+  "name": "bot-my-meals",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-09",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "bot-my-meals"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+# Gate only. Production deploy is Cloudflare Workers Builds
+# (build `npm run build:worker` + deploy `node scripts/cf-deploy.mjs`).
+# Dashboard clicks: docs/workers-builds.md.
+# Do not add a second Actions deploy unless that is the chosen path
+# and CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID are GitHub secrets —
+# never both pipelines promoting production.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  check:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Worker build smoke
+        run: npm run build:worker

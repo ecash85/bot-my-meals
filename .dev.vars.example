@@ -1,0 +1,9 @@
+# Copy to .dev.vars for wrangler / OpenNext local preview.
+# Household or two-phone use: set the two public keys from a new
+# Supabase Free project. Blank values show the setup gate — that is
+# an incomplete install, not a demo. Never put the service-role key here.
+# Magic-link Site URL / Redirect URL must match the origin phones open.
+# See docs/domains.md.
+NEXTJS_ENV=development
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
