@@ -6,7 +6,7 @@ Shared Grok Bots poll this household’s Worker. The app does not push, and **Ch
 
 Adaptive is the default.
 
-- Start `@every 1h` when setup is incomplete or work is pending (ballot, meal, portion, or a plate/people change the bot still needs to apply).
+- Start `@every 1h` when setup is incomplete or work is pending (ballot, meal, portion, a plate/people change the bot still needs to apply, or a locked week still missing recipes or a shopping list).
 - Otherwise `@every 6h` (week settled, nothing pending).
 - If the owner picks a fixed check in **House → Bot check frequency**, keep that interval: `@every 1h`, `@every 3h`, or `@every 6h`.
 
@@ -20,5 +20,6 @@ On each run:
    - `meal_pending` — an open swap or a new-dinner request
    - `portion_pending` — a dinner’s servings don’t match the plates
    - `plate_or_people_change` — plates or household size changed and a dinner’s servings still need to catch up
+   - `fill_pending` — the week is locked and a dinner is still missing a recipe, or the shopping list is empty when a dinner needs groceries. Write those. Do not invent a list when nothing needs buying.
 
 Never invent grocery prices. Never claim Smith’s cart adds.

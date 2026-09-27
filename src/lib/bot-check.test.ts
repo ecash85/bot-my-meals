@@ -24,6 +24,7 @@ import {
   botCheckSettingFromChoice,
   botCheckUpdateColumns,
   botCheckWrite,
+  botCheckForSnapshot,
   deriveBotCheckStatus,
   fixedWaitingCadenceLine,
   normalizeBotCheckSetting,
@@ -47,6 +48,7 @@ function status(overrides: {
   householdSize?: number;
   nightHeadcounts?: number[];
   meals?: BotWorkMeal[];
+  fillPending?: boolean;
 } = {}): BotCheckStatus {
   return deriveBotCheckStatus({
     mode: "adaptive",
@@ -132,6 +134,7 @@ describe("bot status needs_work reasons", () => {
       "meal_pending",
       "plate_or_people_change",
       "portion_pending",
+      "fill_pending",
       "setup_incomplete",
       "idle",
     ]);
@@ -183,6 +186,137 @@ describe("bot status needs_work reasons", () => {
       reason: "setup_incomplete",
     });
     expect(JSON.stringify(status())).not.toMatch(/price|smith/i);
+  });
+
+  it("wakes after lock when recipes or the shopping list are still empty", () => {
+    const gap = status({ fillPending: true });
+    expect(gap).toMatchObject({
+      needs_work: true,
+      reason: "fill_pending",
+      cadence: { mode: "adaptive", interval_hours: 1, phase: "active" },
+    });
+    expect(waitingCadenceLine(gap, { pendingWorkOnly: true })).toBe(BOT_CHECK_WAITING_ADAPTIVE);
+    const waitingHtml = renderToStaticMarkup(
+      createElement(WaitingBotCheck, { status: gap, pendingWorkOnly: true }),
+    );
+    expect(waitingHtml).toContain("Checks about every hour while you\u2019re waiting.");
+    expect(waitingHtml).toContain("Check now");
+    expect(status({ fillPending: true, setupComplete: false }).reason).toBe("fill_pending");
+    expect(status({ fillPending: true, ballotStatus: "pending" }).reason).toBe("pending_ballot");
+    expect(
+      status({
+        fillPending: true,
+        meals: [{ lifecycle: "passive", servings: 2, expectedServings: 4 }],
+      }).reason,
+    ).toBe("portion_pending");
+    expect(JSON.stringify(gap)).not.toMatch(/price|smith/i);
+
+    const household = {
+      botCheckMode: "adaptive" as const,
+      botCheckIntervalHours: null,
+      setupStep: 8,
+      householdSize: 4,
+      nightHeadcounts: PLATES,
+      coupleNights: [5, 6],
+      familySize: 4,
+      coupleSize: 2,
+    };
+    const dinner = {
+      id: "m1",
+      title: "Lemon roast chicken",
+      servings: 4,
+      nightDate: "2026-09-28",
+    };
+    const ingredient = { id: "i1", name: "Chicken", quantity: 1, unit: "lb", storeId: "store" };
+    const readyRecipe = {
+      id: "r1",
+      mealId: "m1",
+      servings: 4,
+      prepMinutes: 10,
+      cookMinutes: 20,
+      steps: ["Roast the chicken."],
+      ingredients: [ingredient],
+    };
+    const base = {
+      household,
+      meals: [dinner],
+      votes: [],
+      memberships: [],
+    };
+
+    expect(
+      botCheckForSnapshot({ ...base, week: { status: "locked" }, recipes: [], shoppingList: null }),
+    ).toMatchObject({ needs_work: true, reason: "fill_pending" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        week: { status: "locked" },
+        recipes: [{ ...readyRecipe, steps: ["  "] }],
+        shoppingList: { items: [{ id: "item" }] },
+      }),
+    ).toMatchObject({ needs_work: true, reason: "fill_pending" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        week: { status: "locked" },
+        recipes: [readyRecipe],
+        shoppingList: { items: [] },
+      }),
+    ).toMatchObject({ needs_work: true, reason: "fill_pending" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        week: { status: "voting" },
+        recipes: [],
+        shoppingList: null,
+      }),
+    ).toMatchObject({ needs_work: false, reason: "idle" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        week: { status: "locked" },
+        recipes: [readyRecipe],
+        shoppingList: { items: [{ id: "item" }] },
+      }),
+    ).toMatchObject({ needs_work: false, reason: "idle" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        week: { status: "locked" },
+        recipes: [{ ...readyRecipe, ingredients: [] }],
+        shoppingList: { items: [] },
+      }),
+    ).toMatchObject({ needs_work: false, reason: "idle" });
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        meals: [{ ...dinner, title: "Skipped pasta" }],
+        votes: [
+          {
+            id: "v1",
+            householdId: "h",
+            mealId: "m1",
+            membershipId: "mem",
+            choice: "remove",
+            note: "",
+            updatedAt: "2026-09-27T00:00:00.000Z",
+          },
+        ],
+        memberships: [
+          {
+            id: "mem",
+            householdId: "h",
+            userId: "user",
+            role: "owner",
+            displayName: "Ada",
+            email: "ada@example.com",
+          },
+        ],
+        week: { status: "locked" },
+        recipes: [],
+        shoppingList: { items: [] },
+      }),
+    ).toMatchObject({ needs_work: false, reason: "idle" });
   });
 });
 
@@ -327,7 +461,9 @@ describe("bot check migration and shared-bot docs", () => {
     expect(docs).toMatch(/@every 3h/);
     expect(docs).toMatch(/\/api\/bot\/status/);
     expect(docs).toMatch(/needs_work/);
+    expect(docs).toMatch(/fill_pending/);
     expect(docs).toMatch(/stay silent/i);
+    expect(docs).toMatch(/Never invent grocery prices/);
     expect(docs).not.toMatch(/Force sync/);
     expect(readme).toMatch(/adaptive/i);
     expect(readme).toMatch(/@every 1h/);
@@ -381,19 +517,31 @@ function statusClient(input: {
   user?: { id: string } | null;
   membership?: { household_id: string } | null;
   household?: Record<string, unknown> | null;
-  week?: { id: string } | null;
+  week?: { id: string; status?: string } | null;
   ballot?: Record<string, unknown> | null;
   meals?: Array<Record<string, unknown>>;
+  recipes?: Array<Record<string, unknown>>;
+  ingredients?: Array<Record<string, unknown>>;
+  shoppingList?: { id: string } | null;
+  shoppingItems?: Array<Record<string, unknown>>;
   selects: string[];
 }): SupabaseClient {
   let membershipReads = 0;
+  const record = (table: string) => (columns: string) => input.selects.push(`${table}:${columns}`);
   return {
     auth: {
       getUser: async () => ({ data: { user: input.user === undefined ? { id: "user-1" } : input.user } }),
     },
     from(table: string) {
-      if (table === "recipes" || table === "shopping_items" || table === "shopping_lists" || table === "recipe_ingredients") {
-        throw new Error(`status read should stay cheap, saw ${table}`);
+      if (table === "recipes") return query({ data: input.recipes ?? [], error: null }, record(table));
+      if (table === "recipe_ingredients") {
+        return query({ data: input.ingredients ?? [], error: null }, record(table));
+      }
+      if (table === "shopping_lists") {
+        return query({ data: input.shoppingList ?? null, error: null }, record(table));
+      }
+      if (table === "shopping_items") {
+        return query({ data: input.shoppingItems ?? [], error: null }, record(table));
       }
       if (table === "memberships") {
         membershipReads += 1;
@@ -449,6 +597,9 @@ describe("supabaseBotCheckStatus", () => {
     });
     expect(selects.some((columns) => columns.includes("bot_check_mode"))).toBe(true);
     expect(selects.some((columns) => columns.includes("*"))).toBe(false);
+    expect(selects.some((columns) => columns.startsWith("recipes:"))).toBe(false);
+    expect(selects.some((columns) => columns.startsWith("shopping_"))).toBe(false);
+    expect(selects.some((columns) => columns.startsWith("recipe_ingredients:"))).toBe(false);
   });
 
   it("flags a pending ballot and keeps a fixed interval on a quiet wake", async () => {
@@ -493,6 +644,100 @@ describe("supabaseBotCheckStatus", () => {
         reason: "idle",
         cadence: { mode: "fixed", interval_hours: 3, phase: "idle" },
       },
+    });
+  });
+
+  it("reports fill_pending after lock when recipes or the list are empty, and idle once both are ready", async () => {
+    const dinner = {
+      id: "m1",
+      title: "Lemon roast chicken",
+      servings: 4,
+      night_date: "2026-09-28",
+    };
+    const lockedWeek = { id: "week-1", status: "locked" };
+
+    const missingSelects: string[] = [];
+    const missing = await supabaseBotCheckStatus(
+      statusClient({ selects: missingSelects, week: lockedWeek, meals: [dinner] }),
+    );
+    expect(missing).toMatchObject({
+      ok: true,
+      body: {
+        needs_work: true,
+        reason: "fill_pending",
+        cadence: { mode: "adaptive", interval_hours: 1, phase: "active" },
+      },
+    });
+    expect(missingSelects).toContain("recipes:id, meal_id, steps");
+    expect(missingSelects).toContain("shopping_lists:id");
+    expect(missingSelects.some((columns) => columns.startsWith("recipe_ingredients:"))).toBe(false);
+    expect(missingSelects.some((columns) => columns.includes("*"))).toBe(false);
+    expect(JSON.stringify(missing)).not.toMatch(/price|smith/i);
+
+    const emptyListSelects: string[] = [];
+    const emptyList = await supabaseBotCheckStatus(
+      statusClient({
+        selects: emptyListSelects,
+        week: lockedWeek,
+        meals: [dinner],
+        recipes: [{ id: "r1", meal_id: "m1", steps: ["Roast the chicken."] }],
+        ingredients: [{ recipe_id: "r1" }],
+        shoppingList: { id: "list-1" },
+        shoppingItems: [],
+      }),
+    );
+    expect(emptyList).toMatchObject({
+      ok: true,
+      body: { needs_work: true, reason: "fill_pending" },
+    });
+    expect(emptyListSelects).toContain("shopping_items:id");
+
+    const votingSelects: string[] = [];
+    const voting = await supabaseBotCheckStatus(
+      statusClient({
+        selects: votingSelects,
+        week: { id: "week-1", status: "voting" },
+        meals: [dinner],
+      }),
+    );
+    expect(voting).toMatchObject({ ok: true, body: { needs_work: false, reason: "idle" } });
+    expect(votingSelects.some((columns) => columns.startsWith("recipes:"))).toBe(false);
+
+    const ready = await supabaseBotCheckStatus(
+      statusClient({
+        selects: [],
+        week: lockedWeek,
+        meals: [dinner],
+        recipes: [{ id: "r1", meal_id: "m1", steps: ["Roast the chicken."] }],
+        ingredients: [{ recipe_id: "r1" }],
+        shoppingList: { id: "list-1" },
+        shoppingItems: [{ id: "item-1" }],
+      }),
+    );
+    expect(ready).toMatchObject({
+      ok: true,
+      body: {
+        needs_work: false,
+        reason: "idle",
+        cadence: { mode: "adaptive", interval_hours: 6, phase: "idle" },
+      },
+    });
+    expect(JSON.stringify(ready)).not.toMatch(/price|smith/i);
+
+    const nothingToBuy = await supabaseBotCheckStatus(
+      statusClient({
+        selects: [],
+        week: lockedWeek,
+        meals: [dinner],
+        recipes: [{ id: "r1", meal_id: "m1", steps: ["Heat and serve."] }],
+        ingredients: [],
+        shoppingList: { id: "list-1" },
+        shoppingItems: [],
+      }),
+    );
+    expect(nothingToBuy).toMatchObject({
+      ok: true,
+      body: { needs_work: false, reason: "idle" },
     });
   });
 });

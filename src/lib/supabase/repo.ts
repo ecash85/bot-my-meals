@@ -687,7 +687,91 @@ function asRole(value: unknown): Role | null {
   }
 }
 
-/** Cheap quiet-wake read. No recipes, shopping rows, or full snapshot. */
+function asWeekStatus(value: unknown): "voting" | "locked" | null {
+  switch (value) {
+    case "voting":
+    case "locked":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function asSteps(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((step) => (typeof step === "string" ? [step] : []));
+}
+
+/**
+ * Quiet wakes skip recipe and shopping reads. A locked week reads only enough
+ * to see whether dinners still need recipes or a shopping list.
+ */
+async function loadLockedWeekFill(
+  client: SupabaseClient,
+  householdId: string,
+  weekId: string,
+  mealIds: string[],
+): Promise<{ recipes: Recipe[]; shoppingList: { items: readonly unknown[] } | null }> {
+  const [recipesRes, listRes] = await Promise.all([
+    client
+      .from("recipes")
+      .select("id, meal_id, steps")
+      .eq("household_id", householdId)
+      .in("meal_id", mealIds),
+    client
+      .from("shopping_lists")
+      .select("id")
+      .eq("household_id", householdId)
+      .eq("week_id", weekId)
+      .maybeSingle(),
+  ]);
+  if (recipesRes.error) throw new Error(recipesRes.error.message);
+  if (listRes.error) throw new Error(listRes.error.message);
+
+  const recipeRows = recipesRes.data ?? [];
+  const recipeIds = recipeRows.map((row) => String(row.id));
+  let ingredientRecipeIds: string[] = [];
+  if (recipeIds.length) {
+    const ingredientsRes = await client
+      .from("recipe_ingredients")
+      .select("recipe_id")
+      .eq("household_id", householdId)
+      .in("recipe_id", recipeIds);
+    if (ingredientsRes.error) throw new Error(ingredientsRes.error.message);
+    ingredientRecipeIds = (ingredientsRes.data ?? []).map((row) => String(row.recipe_id));
+  }
+
+  let shoppingList: { items: readonly unknown[] } | null = null;
+  if (listRes.data?.id) {
+    const itemsRes = await client
+      .from("shopping_items")
+      .select("id")
+      .eq("shopping_list_id", String(listRes.data.id))
+      .limit(1);
+    if (itemsRes.error) throw new Error(itemsRes.error.message);
+    shoppingList = { items: (itemsRes.data ?? []).length > 0 ? [{}] : [] };
+  }
+
+  const recipes: Recipe[] = recipeRows.map((row) => {
+    const id = String(row.id);
+    const hasIngredient = ingredientRecipeIds.includes(id);
+    return {
+      id,
+      mealId: String(row.meal_id),
+      servings: 0,
+      prepMinutes: 0,
+      cookMinutes: 0,
+      steps: asSteps(row.steps),
+      ingredients: hasIngredient
+        ? [{ id: `${id}-ingredient`, name: "ingredient", quantity: 1, unit: "", storeId: "store" }]
+        : [],
+    };
+  });
+
+  return { recipes, shoppingList };
+}
+
+/** Quiet-wake read. Recipe and shopping rows load only after the week is locked. */
 export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<BotCheckStatusResult> {
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) return { ok: false, error: "unauthorized" };
@@ -714,7 +798,7 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
 
   const { data: week, error: weekError } = await client
     .from("weeks")
-    .select("id")
+    .select("id, status")
     .eq("household_id", householdId)
     .order("starts_on", { ascending: false })
     .limit(1)
@@ -729,6 +813,9 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
   let meals: BotCheckMeal[] = [];
   let votes: Vote[] = [];
   let members: Membership[] = [];
+  let recipes: Recipe[] = [];
+  let shoppingList: { items: readonly unknown[] } | null = null;
+  const weekStatus = asWeekStatus(week?.status);
 
   if (week?.id) {
     const [ballotRes, mealsRes] = await Promise.all([
@@ -811,6 +898,17 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
         ];
       });
     }
+
+    if (weekStatus === "locked" && meals.length) {
+      const fill = await loadLockedWeekFill(
+        client,
+        householdId,
+        String(week.id),
+        meals.map((meal) => meal.id),
+      );
+      recipes = fill.recipes;
+      shoppingList = fill.shoppingList;
+    }
   }
 
   const botCheck = normalizeBotCheckSetting(
@@ -839,6 +937,9 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
       votes,
       memberships: members,
       ballotRequest: ballot,
+      week: weekStatus ? { status: weekStatus } : undefined,
+      recipes,
+      shoppingList,
     }),
   };
 }

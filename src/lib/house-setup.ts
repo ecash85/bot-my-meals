@@ -162,6 +162,7 @@ export function grokBotPastePrompt(input: {
     `Budget: ${budget}.`,
     "Check on an adaptive routine: @every 1h while setup is incomplete or work is pending, otherwise @every 6h.",
     "On each run, read GET /api/bot/status and House → Bot check frequency. Do the work when needs_work is true, and stay silent when nothing changed.",
+    "fill_pending means this locked week still needs recipes or a shopping list. Write those, and skip a list when nothing needs buying.",
     "If that setting changes, update your own routine.",
     "Never invent grocery prices. Never claim Smith's cart adds.",
   ].join(" ");

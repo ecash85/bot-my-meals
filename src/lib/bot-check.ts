@@ -1,6 +1,7 @@
 import { headcountForNight, normalizeNightHeadcounts } from "./headcount";
 import { clampHouseholdSize, isHouseSetupComplete, parseBallotRequestStatus } from "./house-setup";
 import { nightLifecycle } from "./lock";
+import { isPendingBotFill } from "./post-lock-waiting";
 import type {
   BallotRequest,
   BallotRequestStatus,
@@ -10,7 +11,9 @@ import type {
   Meal,
   Membership,
   NightLifecycle,
+  Recipe,
   Vote,
+  Week,
 } from "./types";
 
 export type BotCheckHousehold = Pick<
@@ -60,6 +63,7 @@ export const BOT_WORK_REASONS = [
   "meal_pending",
   "plate_or_people_change",
   "portion_pending",
+  "fill_pending",
   "setup_incomplete",
   "idle",
 ] as const;
@@ -215,6 +219,8 @@ export function botWorkReason(input: {
   householdSize: number;
   nightHeadcounts: number[];
   meals: BotWorkMeal[];
+  /** Locked week still missing recipes and/or a shopping list. */
+  fillPending?: boolean;
 }): BotWorkReason {
   const portionGap = input.meals.some(dinnerNeedsPortions);
   const ballotWritten = input.ballotStatus === "fulfilled" || input.ballotStatus === "cancelled";
@@ -229,6 +235,7 @@ export function botWorkReason(input: {
   }
   if (plateDrift && portionGap) return "plate_or_people_change";
   if (portionGap) return "portion_pending";
+  if (input.fillPending) return "fill_pending";
   if (!input.setupComplete) return "setup_incomplete";
   return "idle";
 }
@@ -239,6 +246,7 @@ export function botWorkNeedsAction(reason: BotWorkReason): boolean {
     case "meal_pending":
     case "plate_or_people_change":
     case "portion_pending":
+    case "fill_pending":
       return true;
     case "setup_incomplete":
     case "idle":
@@ -258,6 +266,7 @@ export function botCheckPhase(reason: BotWorkReason): BotCheckPhase {
     case "meal_pending":
     case "plate_or_people_change":
     case "portion_pending":
+    case "fill_pending":
     case "setup_incomplete":
       return "active";
     default: {
@@ -294,6 +303,7 @@ export function deriveBotCheckStatus(input: {
   householdSize: number;
   nightHeadcounts: number[];
   meals: BotWorkMeal[];
+  fillPending?: boolean;
 }): BotCheckStatus {
   const setting = normalizeBotCheckSetting(input.mode, input.intervalHours);
   const reason = botWorkReason({
@@ -304,6 +314,7 @@ export function deriveBotCheckStatus(input: {
     householdSize: input.householdSize,
     nightHeadcounts: input.nightHeadcounts,
     meals: input.meals,
+    fillPending: input.fillPending,
   });
   const phase = botCheckPhase(reason);
   return {
@@ -374,9 +385,22 @@ export function botCheckForSnapshot(snapshot: {
   votes: Vote[];
   memberships: Membership[];
   ballotRequest?: Pick<BallotRequest, "status" | "householdSize" | "nightHeadcounts"> | null;
+  week?: Pick<Week, "status">;
+  recipes?: Recipe[];
+  shoppingList?: { items: readonly unknown[] } | null;
 }): BotCheckStatus {
   const household = snapshot.household;
   const ballot = snapshot.ballotRequest ?? null;
+  const fillPending = snapshot.week
+    ? isPendingBotFill({
+        weekStatus: snapshot.week.status,
+        meals: snapshot.meals,
+        votes: snapshot.votes,
+        memberships: snapshot.memberships,
+        recipes: snapshot.recipes ?? [],
+        shoppingList: snapshot.shoppingList ?? null,
+      })
+    : false;
   return deriveBotCheckStatus({
     mode: household.botCheckMode,
     intervalHours: household.botCheckIntervalHours,
@@ -387,5 +411,6 @@ export function botCheckForSnapshot(snapshot: {
     householdSize: household.householdSize,
     nightHeadcounts: household.nightHeadcounts,
     meals: mealFacts(household, snapshot.meals, snapshot.votes, snapshot.memberships),
+    fillPending,
   });
 }

@@ -11,7 +11,6 @@ import type {
   Meal,
   Membership,
   Recipe,
-  ShoppingList,
   Vote,
   WeekStatus,
 } from "./types";
@@ -32,11 +31,11 @@ export const RECIPE_PENDING_BACK = "Back to This week";
 
 export type PendingBotFillInput = {
   weekStatus: WeekStatus;
-  meals: Meal[];
+  meals: ReadonlyArray<Pick<Meal, "id" | "title">>;
   votes: Vote[];
   memberships: Membership[];
   recipes: Recipe[];
-  shoppingList: Pick<ShoppingList, "items"> | null;
+  shoppingList: { items: readonly unknown[] } | null;
 };
 
 export type LockedDinnerTap = "none" | "waiting" | "recipe";
@@ -55,7 +54,11 @@ export function dinnerRecipeReady(meal: Pick<Meal, "id" | "title">, recipes: Rec
   return recipe.steps.some((step) => step.trim().length > 0);
 }
 
-function isLockedDinner(meal: Meal, votes: Vote[], memberships: Membership[]): boolean {
+function isLockedDinner(
+  meal: Pick<Meal, "id" | "title">,
+  votes: Vote[],
+  memberships: Membership[],
+): boolean {
   const lifecycle = nightLifecycle(meal, votes, memberships);
   switch (lifecycle) {
     case "passive":
@@ -72,7 +75,10 @@ function isLockedDinner(meal: Meal, votes: Vote[], memberships: Membership[]): b
   }
 }
 
-function dinnersNeedGroceries(dinners: Meal[], recipes: Recipe[]): boolean {
+function dinnersNeedGroceries(
+  dinners: ReadonlyArray<Pick<Meal, "id">>,
+  recipes: Recipe[],
+): boolean {
   return dinners.some((meal) => (recipeForMeal(recipes, meal.id)?.ingredients.length ?? 0) > 0);
 }
 
@@ -81,8 +87,8 @@ function dinnersNeedGroceries(dinners: Meal[], recipes: Recipe[]): boolean {
  * recipe and none of those recipes need groceries (nothing to buy).
  */
 export function shoppingListReadyForLock(
-  shoppingList: Pick<ShoppingList, "items"> | null,
-  dinners: Meal[],
+  shoppingList: { items: readonly unknown[] } | null,
+  dinners: ReadonlyArray<Pick<Meal, "id">>,
   recipes: Recipe[],
   recipesReady: boolean,
 ): boolean {
