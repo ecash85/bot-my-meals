@@ -24,6 +24,8 @@ Official Cloudflare docs: [Workers Builds](https://developers.cloudflare.com/wor
 
 ## Click pass (do this once)
 
+Tim’s household Worker `bot-my-meals` on his Cloudflare account deploys from this public repo (`timdoes/bot-my-meals`), not the marketing monorepo. DIY households still connect their own fork or template copy.
+
 1. Open [Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages).
 2. Create or open Worker **`bot-my-meals`**. If the name is wrong, stop — do not rename; open/create the correct Worker.
 3. **Settings → Builds**.
