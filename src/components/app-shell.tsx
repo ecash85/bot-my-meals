@@ -56,17 +56,16 @@ export function AppShell({
         ref={headRef}
         className="sticky top-0 z-20 bg-card/95 pt-[env(safe-area-inset-top)] backdrop-blur-md"
       >
-        <header className="px-5 pb-3 pt-2">
+        <header className="px-5 pb-3 pt-2" data-slot="app-header">
+          <BrandMark size="compact" />
           {backHref ? (
             <Link
               href={backHref}
-              className="type-meta mb-1 inline-flex min-h-8 items-center font-semibold text-primary"
+              className="type-meta mt-3 mb-1 inline-flex min-h-8 items-center font-semibold text-primary"
             >
               ← {backLabel}
             </Link>
-          ) : (
-            <BrandMark size="compact" />
-          )}
+          ) : null}
           {eyebrow ? (
             <p className={cn("type-eyebrow text-primary", !backHref && "mt-3")}>{eyebrow}</p>
           ) : null}

@@ -148,6 +148,12 @@ describe("theme D Clear Sky brand tokens", () => {
     const shell = readFileSync(path.join(srcRoot, "components/app-shell.tsx"), "utf8");
     expect(shell).toContain("BrandMark");
     expect(shell).toContain('size="compact"');
+    const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
+    expect(header).toContain('data-slot="app-header"');
+    expect(header).toContain('<BrandMark size="compact" />');
+    expect(header.indexOf("<BrandMark")).toBeLessThan(header.indexOf("{backHref"));
+    expect(header).toContain("← {backLabel}");
+    expect(header).not.toMatch(/backHref \? \([\s\S]*\) : \(\s*<BrandMark/);
 
     const manifest = readFileSync(path.join(srcRoot, "app/manifest.ts"), "utf8");
     expect(manifest).toContain("BRAND_ICON_192_SRC");
@@ -214,6 +220,26 @@ describe("theme D Clear Sky brand tokens", () => {
       }
     };
     for (const root of iconRoots) walkIcons(root);
+  });
+
+  it("uses the shared This week header on signed-in product screens", () => {
+    const screens = [
+      "app/week/page.tsx",
+      "app/recipes/page.tsx",
+      "app/list/page.tsx",
+      "app/settings/page.tsx",
+      "app/settings/history/page.tsx",
+      "app/settings/history/[startsOn]/page.tsx",
+      "app/week/[mealId]/page.tsx",
+      "components/setup-wizard.tsx",
+      "components/onboarding.tsx",
+    ];
+    for (const rel of screens) {
+      const source = readFileSync(path.join(srcRoot, rel), "utf8");
+      expect(source, rel).toContain("<AppShell");
+      expect(source, rel).not.toContain("mark-chef");
+      expect(source, rel).not.toContain("<img");
+    }
   });
 
   it("does not ship Clear Sky / Blue & White theme pills in product UI", () => {
