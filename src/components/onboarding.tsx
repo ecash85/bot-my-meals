@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useSupper } from "@/components/supper-provider";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export function Onboarding() {
             aria-label={busy ? "Creating household" : "Create household"}
             aria-busy={busy}
           >
+            {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : null}
             {busy ? "Creating…" : "Create household"}
           </Button>
         </form>

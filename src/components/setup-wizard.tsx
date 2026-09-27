@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Minus, Plus } from "lucide-react";
+import { Loader2, Minus, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { HouseCard } from "@/components/house-card";
@@ -175,7 +175,7 @@ export function SetupWizard() {
             aria-busy={busy}
             onClick={() => void createMeals()}
           >
-            {busy ? "Saving…" : CREATE_MEALS_CTA}
+            <SetupSubmitLabel busy={busy} label={CREATE_MEALS_CTA} />
           </Button>
           <Button
             type="button"
@@ -203,7 +203,7 @@ export function SetupWizard() {
             aria-busy={busy}
             onClick={() => void saveBudgetAndContinue()}
           >
-            {busy ? "Saving…" : budget.trim() ? "Continue" : "Skip"}
+            <SetupSubmitLabel busy={busy} label={budget.trim() ? "Continue" : "Skip"} />
           </Button>
           <Button
             type="button"
@@ -231,7 +231,7 @@ export function SetupWizard() {
             aria-busy={busy}
             onClick={() => void advance()}
           >
-            {busy ? "Saving…" : "Continue"}
+            <SetupSubmitLabel busy={busy} label="Continue" />
           </Button>
           <Button
             type="button"
@@ -259,7 +259,7 @@ export function SetupWizard() {
             aria-busy={busy}
             onClick={() => void saveSizeAndContinue()}
           >
-            {busy ? "Saving…" : meta.cta}
+            <SetupSubmitLabel busy={busy} label={meta.cta} />
           </Button>
           <Button
             type="button"
@@ -287,7 +287,7 @@ export function SetupWizard() {
             aria-busy={busy}
             onClick={() => void saveNightsAndContinue()}
           >
-            {busy ? "Saving…" : "Continue"}
+            <SetupSubmitLabel busy={busy} label="Continue" />
           </Button>
           <Button
             type="button"
@@ -320,7 +320,7 @@ export function SetupWizard() {
               )
             }
           >
-            {busy ? "Saving…" : "Continue"}
+            <SetupSubmitLabel busy={busy} label="Continue" />
           </Button>
           {step > 1 ? (
             <Button
@@ -523,5 +523,15 @@ function CountStepper({
         className="sr-only"
       />
     </div>
+  );
+}
+
+function SetupSubmitLabel({ busy, label }: { busy: boolean; label: string }) {
+  if (!busy) return label;
+  return (
+    <>
+      <Loader2 className="size-5 animate-spin" aria-hidden />
+      Saving…
+    </>
   );
 }

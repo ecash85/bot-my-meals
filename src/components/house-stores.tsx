@@ -39,7 +39,10 @@ export function HouseStores({
   const persistPostal = (value: string) => {
     const next = value.trim() ? normalizePostalCode(value) : "";
     setPostalDraft(next);
-    if (onPostalCode) void onPostalCode(next);
+    if (!onPostalCode) return;
+    void Promise.resolve(onPostalCode(next)).catch(() => {
+      setPostalDraft(null);
+    });
   };
 
   const addCustomStore = () => {

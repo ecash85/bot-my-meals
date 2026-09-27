@@ -99,10 +99,10 @@ export function LoginHome({
                 size="fat"
                 className="w-full"
                 disabled={busy !== null}
-                aria-label="Email me a sign-in link"
+                aria-label={busy === "email" ? "Sending…" : "Email me a sign-in link"}
                 aria-busy={busy === "email"}
               >
-                Email me a sign-in link
+                {busy === "email" ? "Sending…" : "Email me a sign-in link"}
               </Button>
               <div>
                 <p className="type-body text-muted-foreground">{LOGIN_SAME_DEVICE_COPY}</p>

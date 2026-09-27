@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils";
 export function BallotToast({
   message,
   onDismiss,
+  alert = false,
 }: {
   message?: string;
   onDismiss: () => void;
+  alert?: boolean;
 }) {
   useEffect(() => {
     if (!message) return;
@@ -21,8 +23,8 @@ export function BallotToast({
   return (
     <div
       data-slot="ballot-toast"
-      role="status"
-      aria-live="polite"
+      role={alert ? "alert" : "status"}
+      aria-live={alert ? "assertive" : "polite"}
       className={cn(
         "fixed inset-x-4 z-40 mx-auto max-w-lg rounded-[14px] bg-card px-4 py-3 shadow-float",
         "bottom-[calc(4.5rem+env(safe-area-inset-bottom))]",

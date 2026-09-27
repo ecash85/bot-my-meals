@@ -48,29 +48,19 @@ export function EmptyDayCard({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
   const noteFieldId = mealCardControlId("add-note", dayLabel);
 
-  const requestDinner = async () => {
+  const requestDinner = () => {
     if (!onAdd) return;
-    setBusy(true);
-    try {
-      await onAdd(draft.trim());
-      setDraft("");
-      setOpen(false);
-    } finally {
-      setBusy(false);
-    }
+    const pending = onAdd(draft.trim());
+    setDraft("");
+    setOpen(false);
+    void Promise.resolve(pending).catch(() => undefined);
   };
 
-  const cancelRequest = async () => {
+  const cancelRequest = () => {
     if (!onCancel) return;
-    setBusy(true);
-    try {
-      await onCancel();
-    } finally {
-      setBusy(false);
-    }
+    void Promise.resolve(onCancel()).catch(() => undefined);
   };
 
   return (
@@ -107,8 +97,7 @@ export function EmptyDayCard({
               type="button"
               variant="link"
               className="mt-3 h-auto min-h-12 px-0 text-base"
-              disabled={busy}
-              onClick={() => void cancelRequest()}
+              onClick={() => cancelRequest()}
             >
               {PENDING_ADD_CANCEL}
             </Button>
@@ -163,7 +152,6 @@ export function EmptyDayCard({
               size="fat"
               variant="outline"
               className="flex-1"
-              disabled={busy}
               onClick={() => setOpen(false)}
             >
               {SWAP_SHEET_CANCEL}
@@ -173,8 +161,7 @@ export function EmptyDayCard({
               size="fat"
               variant="primary"
               className="flex-1 shadow-float"
-              disabled={busy}
-              onClick={() => void requestDinner()}
+              onClick={() => requestDinner()}
             >
               {ADD_SHEET_SEND}
             </Button>

@@ -7,6 +7,7 @@ import { LockFirstEmpty } from "@/components/lock-first-empty";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
+import { useOptimisticValue } from "@/components/use-optimistic-value";
 import { formatWeekEyebrow } from "@/lib/dates";
 import { isNightOff } from "@/lib/lock";
 import {
@@ -111,12 +112,13 @@ function ListBody() {
               {group.items.map((item) => {
                 const display = listItemDisplay(item);
                 return (
-                  <ListRow
+                  <ShoppingListRow
                     key={item.id}
+                    itemId={item.id}
                     name={display.name}
                     quantity={display.quantity}
                     checked={item.checked}
-                    onCheckedChange={(checked) => void toggleItem(item.id, checked)}
+                    onToggle={toggleItem}
                   />
                 );
               })}
@@ -125,5 +127,30 @@ function ListBody() {
         ))}
       </div>
     </AppShell>
+  );
+}
+
+function ShoppingListRow({
+  itemId,
+  name,
+  quantity,
+  checked,
+  onToggle,
+}: {
+  itemId: string;
+  name: string;
+  quantity: string;
+  checked: boolean;
+  onToggle: (itemId: string, checked: boolean) => Promise<void>;
+}) {
+  const optimistic = useOptimisticValue(checked, (next) => onToggle(itemId, next));
+  return (
+    <ListRow
+      name={name}
+      quantity={quantity}
+      checked={optimistic.value}
+      syncing={optimistic.pending}
+      onCheckedChange={optimistic.commit}
+    />
   );
 }

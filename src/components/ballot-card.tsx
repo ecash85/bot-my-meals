@@ -67,30 +67,21 @@ export function BallotCard({
 }) {
   const [sheet, setSheet] = useState<"swap" | "remove" | null>(null);
   const [reason, setReason] = useState(swapNote ?? "");
-  const [busy, setBusy] = useState(false);
   const canAct = Boolean(onSwap || onRemove) && !locked;
   const swapFieldId = mealCardControlId("swap-reason", dayLabel);
 
-  const sendSwap = async () => {
+  const sendSwap = () => {
     if (!onSwap) return;
-    setBusy(true);
-    try {
-      await onSwap(reason.trim());
-      setSheet(null);
-    } finally {
-      setBusy(false);
-    }
+    const pending = onSwap(reason.trim());
+    setSheet(null);
+    void Promise.resolve(pending).catch(() => undefined);
   };
 
-  const confirmRemove = async () => {
+  const confirmRemove = () => {
     if (!onRemove) return;
-    setBusy(true);
-    try {
-      await onRemove();
-      setSheet(null);
-    } finally {
-      setBusy(false);
-    }
+    const pending = onRemove();
+    setSheet(null);
+    void Promise.resolve(pending).catch(() => undefined);
   };
 
   return (
@@ -160,7 +151,6 @@ export function BallotCard({
               className="gap-2"
               aria-pressed={swapped}
               aria-label={voteActionLabel("swap", title)}
-              disabled={busy}
               onClick={() => {
                 setReason(swapNote ?? "");
                 setSheet("swap");
@@ -177,7 +167,6 @@ export function BallotCard({
               variant="outline"
               className="gap-2"
               aria-label={voteActionLabel("remove", title)}
-              disabled={busy}
               onClick={() => setSheet("remove")}
             >
               <CircleMinus className="size-5 shrink-0" />
@@ -215,7 +204,6 @@ export function BallotCard({
               size="fat"
               variant="outline"
               className="flex-1"
-              disabled={busy}
               onClick={() => setSheet(null)}
             >
               {SWAP_SHEET_CANCEL}
@@ -225,8 +213,7 @@ export function BallotCard({
               size="fat"
               variant="primary"
               className="flex-1"
-              disabled={busy}
-              onClick={() => void sendSwap()}
+              onClick={() => sendSwap()}
             >
               {SWAP_SHEET_SEND}
             </Button>
@@ -248,8 +235,7 @@ export function BallotCard({
               size="fat"
               variant="skip"
               className="w-full"
-              disabled={busy}
-              onClick={() => void confirmRemove()}
+              onClick={() => confirmRemove()}
             >
               {REMOVE_CONFIRM_ACTION}
             </Button>
@@ -258,7 +244,6 @@ export function BallotCard({
               size="fat"
               variant="outline"
               className="w-full"
-              disabled={busy}
               onClick={() => setSheet(null)}
             >
               {REMOVE_CONFIRM_KEEP}

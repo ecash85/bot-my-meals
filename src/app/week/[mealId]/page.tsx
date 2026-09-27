@@ -32,6 +32,7 @@ function MealDetail({ mealId }: { mealId: string }) {
   const [note, setNote] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customPitch, setCustomPitch] = useState("");
+  const [saving, setSaving] = useState<string | null>(null);
   const meal = snapshot?.meals.find((item) => item.id === mealId);
   const latest =
     meal && snapshot
@@ -67,8 +68,15 @@ function MealDetail({ mealId }: { mealId: string }) {
   const voters = votingMembers(snapshot.memberships);
   const canAct = canActOnBallot(session?.role) && !locked;
 
-  const choose = async (choice: VoteChoice) => {
-    await setVote(meal.id, choice, note);
+  const choose = (choice: VoteChoice) => {
+    void setVote(meal.id, choice, note).catch(() => undefined);
+  };
+
+  const saveProposal = (key: string, run: () => Promise<void>) => {
+    setSaving(key);
+    void run()
+      .catch(() => undefined)
+      .finally(() => setSaving(null));
   };
 
   return (
@@ -157,8 +165,10 @@ function MealDetail({ mealId }: { mealId: string }) {
                 <button
                   key={idea.id}
                   type="button"
-                  onClick={() => void applyIdea(meal.id, idea.id)}
-                  className="tap-target flex w-full flex-col items-start rounded-[14px] border border-border bg-card px-4 py-3 text-left shadow-card"
+                  disabled={saving !== null}
+                  aria-busy={saving === idea.id}
+                  onClick={() => saveProposal(idea.id, () => applyIdea(meal.id, idea.id))}
+                  className="tap-target flex w-full flex-col items-start rounded-[14px] border border-border bg-card px-4 py-3 text-left shadow-card disabled:opacity-50"
                 >
                   <span className="font-semibold">{idea.title}</span>
                   <span className="type-meta text-muted-foreground">{idea.pitch}</span>
@@ -181,16 +191,19 @@ function MealDetail({ mealId }: { mealId: string }) {
               <Button
                 variant="secondary"
                 className="tap-target h-12 w-full rounded-[var(--radius-button)]"
-                disabled={!customTitle.trim()}
+                disabled={!customTitle.trim() || saving !== null}
+                aria-busy={saving === "custom"}
                 onClick={() =>
-                  void proposeReplacement(meal.id, {
-                    title: customTitle.trim(),
-                    pitch: customPitch.trim() || "A new idea for this night.",
-                    prepMinutes: 30,
-                  })
+                  saveProposal("custom", () =>
+                    proposeReplacement(meal.id, {
+                      title: customTitle.trim(),
+                      pitch: customPitch.trim() || "A new idea for this night.",
+                      prepMinutes: 30,
+                    }),
+                  )
                 }
               >
-                Propose this meal
+                {saving === "custom" ? "Saving…" : "Propose this meal"}
               </Button>
             </div>
             {leftoverSources.length ? (
@@ -202,9 +215,11 @@ function MealDetail({ mealId }: { mealId: string }) {
                       key={source.id}
                       variant="outline"
                       className="tap-target h-12 justify-start rounded-[var(--radius-button)]"
-                      onClick={() => void markLeftovers(meal.id, source.id)}
+                      disabled={saving !== null}
+                      aria-busy={saving === source.id}
+                      onClick={() => saveProposal(source.id, () => markLeftovers(meal.id, source.id))}
                     >
-                      Leftover {source.title}
+                      {saving === source.id ? "Saving…" : `Leftover ${source.title}`}
                     </Button>
                   ))}
                 </div>

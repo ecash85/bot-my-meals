@@ -50,6 +50,9 @@ function SettingsBody() {
   const owner = isAdmin(session?.role);
   const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
   const [budgetError, setBudgetError] = useState<string | null>(null);
+  const [budgetBusy, setBudgetBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
   const triedJoinToken = useRef(false);
   const budget =
     budgetDraft ?? formatWeeklyBudgetDollars(snapshot?.household.weeklyBudgetCents);
@@ -84,12 +87,16 @@ function SettingsBody() {
           variant="outline"
           size="fat"
           className="mt-3 w-full"
-          onClick={async () => {
-            await signOut();
-            router.push("/login");
+          disabled={signingOut}
+          aria-busy={signingOut}
+          onClick={() => {
+            setSigningOut(true);
+            void signOut()
+              .then(() => router.push("/login"))
+              .catch(() => setSigningOut(false));
           }}
         >
-          Sign out
+          {signingOut ? "Signing out…" : "Sign out"}
         </Button>
       </HouseCard>
 
@@ -160,13 +167,20 @@ function SettingsBody() {
             onSubmit={(event) => {
               event.preventDefault();
               setBudgetError(null);
+              let weeklyBudgetCents: number | null;
               try {
-                void updateHousehold({ weeklyBudgetCents: parseWeeklyBudgetDollars(budget) }).then(
-                  () => setBudgetDraft(null),
-                );
+                weeklyBudgetCents = parseWeeklyBudgetDollars(budget);
               } catch (err) {
                 setBudgetError(err instanceof Error ? err.message : "Could not save that budget.");
+                return;
               }
+              setBudgetBusy(true);
+              void updateHousehold({ weeklyBudgetCents })
+                .then(() => setBudgetDraft(null))
+                .catch((err: unknown) => {
+                  setBudgetError(err instanceof Error ? err.message : "Could not save that budget.");
+                })
+                .finally(() => setBudgetBusy(false));
             }}
           >
             <Label htmlFor="house-weekly-budget">Weekly meal budget</Label>
@@ -176,8 +190,8 @@ function SettingsBody() {
               postalCode={snapshot.household.postalCode}
               onChange={setBudgetDraft}
             />
-            <Button size="fat" className="w-full">
-              Save budget
+            <Button size="fat" className="w-full" disabled={budgetBusy} aria-busy={budgetBusy}>
+              {budgetBusy ? "Saving…" : "Save budget"}
             </Button>
             {budgetError ? <p className="type-meta text-destructive">{budgetError}</p> : null}
           </form>
@@ -201,8 +215,20 @@ function SettingsBody() {
 
       {owner && snapshot.week.status === "locked" ? (
         <section className="mt-6 space-y-2">
-          <Button variant="outline" size="fat" className="w-full" onClick={() => void unlockWeek()}>
-            Unlock this week
+          <Button
+            variant="outline"
+            size="fat"
+            className="w-full"
+            disabled={unlocking}
+            aria-busy={unlocking}
+            onClick={() => {
+              setUnlocking(true);
+              void unlockWeek()
+                .catch(() => undefined)
+                .finally(() => setUnlocking(false));
+            }}
+          >
+            {unlocking ? "Unlocking…" : "Unlock this week"}
           </Button>
         </section>
       ) : null}

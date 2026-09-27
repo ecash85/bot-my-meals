@@ -211,10 +211,10 @@ export function JoinLanding({ token }: { token: string }) {
               size="fat"
               className="w-full"
               disabled={busy}
-              aria-label="Email me a sign-in link"
+              aria-label={busy ? "Sending…" : "Email me a sign-in link"}
               aria-busy={busy}
             >
-              Email me a sign-in link
+              {busy ? "Sending…" : "Email me a sign-in link"}
             </Button>
             <div>
               <p className="type-body text-muted-foreground">{LOGIN_SAME_DEVICE_COPY}</p>

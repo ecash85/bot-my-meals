@@ -1,6 +1,7 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Lock } from "lucide-react";
 import Link from "next/link";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { useSupper } from "@/components/supper-provider";
@@ -18,6 +19,7 @@ import { firstCookableMeal } from "@/lib/recipes";
 
 export function LockBar() {
   const { snapshot, lockWeek, error } = useSupper();
+  const [busy, setBusy] = useState(false);
   if (!snapshot) return null;
 
   const locked = snapshot.week.status === "locked";
@@ -80,10 +82,17 @@ export function LockBar() {
         size="fat"
         variant="primary"
         className="w-full gap-2 shadow-float"
-        onClick={() => void lockWeek()}
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => {
+          setBusy(true);
+          void lockWeek()
+            .catch(() => undefined)
+            .finally(() => setBusy(false));
+        }}
       >
-        <Lock className="size-5" />
-        Lock this week
+        {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Lock className="size-5" />}
+        {busy ? "Locking…" : "Lock this week"}
       </Button>
       {error ? <p className="type-meta mt-2 text-destructive">{error}</p> : null}
     </div>

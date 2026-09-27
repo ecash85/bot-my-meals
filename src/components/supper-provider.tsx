@@ -1,9 +1,27 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { BallotToast } from "@/components/ballot-toast";
 import { isSupabaseConfigured } from "@/lib/config";
 import { storeSlugForAdd } from "@/lib/grocers";
+import { createId } from "@/lib/ids";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
+import {
+  OPTIMISTIC_STORE_PREFIX,
+  applyOptimistic,
+  dropOptimistic,
+  patchHousehold,
+  patchItemChecked,
+  patchMealProposal,
+  patchMemberRole,
+  patchStoreAdded,
+  patchStoreRemoved,
+  LIST_CHECK_SAVE_ERROR,
+  patchVote,
+  queueOptimistic,
+  type OptimisticPatch,
+  type PendingOptimistic,
+} from "@/lib/optimistic";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   fetchSupabaseSession,
@@ -38,6 +56,10 @@ import type {
 import type { MemberDraft } from "@/lib/users";
 
 const SETUP_REQUIRED = "This install is not connected to Supabase yet. Finish setup first.";
+
+function actionMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Something went wrong.";
+}
 
 type SupperContextValue = {
   ready: boolean;
@@ -135,22 +157,45 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const baseRef = useRef<HouseholdSnapshot | null>(null);
+  const displayRef = useRef<HouseholdSnapshot | null>(null);
+  const patchesRef = useRef<PendingOptimistic<HouseholdSnapshot>[]>([]);
+  const patchSeq = useRef(0);
+  const refreshGen = useRef(0);
+  const chainsRef = useRef(new Map<string, Promise<void>>());
+  const cancelledStoreAdds = useRef(new Set<string>());
+  const storePatchKeys = useRef(new Map<string, string>());
 
-  const refresh = async () => {
+  const publish = useCallback((base: HouseholdSnapshot | null) => {
+    baseRef.current = base;
+    const next = base ? applyOptimistic(base, patchesRef.current) : null;
+    displayRef.current = next;
+    setSnapshot(next);
+  }, []);
+
+  const refresh = useCallback(async () => {
     const client = createSupabaseBrowserClient();
     if (!client) return;
+    const gen = ++refreshGen.current;
     const { data: userData } = await client.auth.getUser();
+    if (gen !== refreshGen.current) return;
     const user = userData.user;
     if (!user) {
+      patchesRef.current = [];
       setSession(null);
-      setSnapshot(null);
+      publish(null);
       return;
     }
     try {
       const nextSession = await fetchSupabaseSession(client);
+      if (gen !== refreshGen.current) return;
+      const nextSnapshot = nextSession ? await fetchSupabaseSnapshot(client, nextSession) : null;
+      if (gen !== refreshGen.current) return;
       setSession(nextSession);
-      setSnapshot(nextSession ? await fetchSupabaseSnapshot(client, nextSession) : null);
+      publish(nextSnapshot);
     } catch (err) {
+      if (gen !== refreshGen.current) return;
       setSession({
         userId: user.id,
         email: user.email ?? "",
@@ -162,7 +207,83 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
         householdId: null,
         role: null,
       });
-      setSnapshot(null);
+      patchesRef.current = [];
+      publish(null);
+      throw err;
+    }
+  }, [publish]);
+
+  const dismissNotice = useCallback(() => setNotice(null), []);
+
+  const run = async <T,>(fn: () => Promise<T> | T): Promise<T> => {
+    setError(null);
+    try {
+      const result = await fn();
+      await refresh();
+      return result;
+    } catch (err) {
+      const message = actionMessage(err);
+      setError(message);
+      setNotice(message);
+      throw err;
+    }
+  };
+
+  const runOptimistic = async <T,>(
+    key: string,
+    apply: OptimisticPatch<HouseholdSnapshot>,
+    fn: () => Promise<T>,
+    options?: { replace?: boolean },
+  ): Promise<T> => {
+    const id = ++patchSeq.current;
+    const replace = options?.replace !== false;
+    const patchKey = replace ? key : `${key}:${id}`;
+    patchesRef.current = replace
+      ? queueOptimistic(patchesRef.current, patchKey, id, apply)
+      : [...patchesRef.current, { id, key: patchKey, apply }];
+    publish(baseRef.current);
+    setError(null);
+
+    const previous = chainsRef.current.get(key) ?? Promise.resolve();
+    let skipped = false;
+    const task = previous.catch(() => undefined).then(async () => {
+      if (!patchesRef.current.some((patch) => patch.id === id)) {
+        skipped = true;
+        return undefined as T;
+      }
+      return fn();
+    });
+    chainsRef.current.set(
+      key,
+      task.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+
+    try {
+      const result = await task;
+      if (skipped) {
+        patchesRef.current = dropOptimistic(patchesRef.current, id);
+        return result;
+      }
+      const mine = patchesRef.current.find((patch) => patch.id === id);
+      patchesRef.current = dropOptimistic(patchesRef.current, id);
+      if (mine && baseRef.current) {
+        baseRef.current = mine.apply(baseRef.current);
+        displayRef.current = applyOptimistic(baseRef.current, patchesRef.current);
+      }
+      await refresh().catch(() => undefined);
+      return result;
+    } catch (err) {
+      const latest = patchesRef.current.some((patch) => patch.id === id);
+      patchesRef.current = dropOptimistic(patchesRef.current, id);
+      if (latest) {
+        publish(baseRef.current);
+        const message = actionMessage(err);
+        setError(message);
+        setNotice(message);
+      }
       throw err;
     }
   };
@@ -202,20 +323,7 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       void client.removeChannel(channel);
     };
-  }, []);
-
-  const run = async <T,>(fn: () => Promise<T> | T): Promise<T> => {
-    setError(null);
-    try {
-      const result = await fn();
-      await refresh();
-      return result;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      throw err;
-    }
-  };
+  }, [refresh]);
 
   const value = useMemo<SupperContextValue>(
     () => ({
@@ -237,12 +345,15 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client || !session) throw new Error("Not signed in");
           await supabaseInviteMember(client, session, draft);
         }),
-      updateMemberRole: (memberId, role) =>
-        run(async () => {
+      updateMemberRole: (memberId, role) => {
+        const current = session;
+        if (!current) return run(async () => { throw new Error("Not signed in"); });
+        return runOptimistic(`member:${memberId}`, (snap) => patchMemberRole(snap, memberId, role), async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          await supabaseSetMemberRole(client, session, memberId, role);
-        }),
+          if (!client) throw new Error("Not signed in");
+          await supabaseSetMemberRole(client, current, memberId, role);
+        });
+      },
       removeMember: (memberId) =>
         run(async () => {
           const client = createSupabaseBrowserClient();
@@ -274,53 +385,90 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           const client = createSupabaseBrowserClient();
           await client?.auth.signOut();
         }),
-      setVote: (mealId, choice, note) =>
-        run(async () => {
-          const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          return supabaseSetVote(client, session, mealId, choice, note ?? "");
-        }),
-      proposeReplacement: (mealId, proposal) =>
-        run(async () => {
-          const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          await supabaseProposeReplacement(client, session, mealId, proposal);
-        }),
-      applyIdea: (mealId, ideaId) =>
-        run(async () => {
-          const idea = REPLACEMENT_IDEAS.find((item) => item.id === ideaId);
-          if (!idea || !snapshot) throw new Error("Unknown idea");
-          const storeBySlug = new Map(snapshot.stores.map((store) => [store.slug, store.id]));
-          const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          await supabaseProposeReplacement(client, session, mealId, {
-            title: idea.title,
-            pitch: idea.pitch,
-            prepMinutes: idea.prepMinutes,
-            steps: idea.steps,
-            ingredients: idea.ingredients.map((ingredient) => ({
-              name: ingredient.name,
-              quantity: ingredient.quantity,
-              unit: ingredient.unit,
-              storeId: storeBySlug.get(ingredient.storeSlug) ?? snapshot.stores[0].id,
-            })),
+      setVote: (mealId, choice, note) => {
+        const current = session;
+        const visible = displayRef.current;
+        if (!current?.membershipId || !current.householdId || !visible) {
+          return run(async () => {
+            throw new Error("Not signed in");
           });
-        }),
-      markLeftovers: (mealId, sourceMealId) =>
-        run(async () => {
-          if (!snapshot) throw new Error("Nothing to mark");
-          const source = snapshot.meals.find((meal) => meal.id === sourceMealId);
-          if (!source) throw new Error("Source meal missing");
+        }
+        const trimmed = note ?? "";
+        return runOptimistic(
+          `vote:${mealId}:${current.membershipId}`,
+          (snap) =>
+            patchVote(snap, {
+              mealId,
+              membershipId: current.membershipId ?? "",
+              householdId: current.householdId ?? "",
+              choice,
+              note: trimmed,
+            }),
+          async () => {
+            const client = createSupabaseBrowserClient();
+            if (!client) throw new Error("Not signed in");
+            return supabaseSetVote(client, current, mealId, choice, trimmed);
+          },
+        );
+      },
+      proposeReplacement: (mealId, proposal) => {
+        const current = session;
+        return runOptimistic(`meal:${mealId}`, (snap) => patchMealProposal(snap, mealId, proposal), async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          await supabaseProposeReplacement(client, session, mealId, {
-            title: `Leftover ${source.title}`,
-            pitch: `Same food as ${source.title}, no extra shopping trip.`,
-            prepMinutes: 15,
-            steps: ["Warm the leftovers and serve."],
-            ingredients: [],
+          if (!client || !current) throw new Error("Not signed in");
+          await supabaseProposeReplacement(client, current, mealId, proposal);
+        });
+      },
+      applyIdea: (mealId, ideaId) => {
+        const current = session;
+        const visible = displayRef.current;
+        const idea = REPLACEMENT_IDEAS.find((item) => item.id === ideaId);
+        if (!idea || !visible || !current) {
+          return run(async () => {
+            throw new Error(!current ? "Not signed in" : "Unknown idea");
           });
-        }),
+        }
+        const storeBySlug = new Map(visible.stores.map((store) => [store.slug, store.id]));
+        const proposal = {
+          title: idea.title,
+          pitch: idea.pitch,
+          prepMinutes: idea.prepMinutes,
+          steps: idea.steps,
+          ingredients: idea.ingredients.map((ingredient) => ({
+            name: ingredient.name,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+            storeId: storeBySlug.get(ingredient.storeSlug) ?? visible.stores[0]?.id ?? "",
+          })),
+        };
+        return runOptimistic(`meal:${mealId}`, (snap) => patchMealProposal(snap, mealId, proposal), async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client) throw new Error("Not signed in");
+          await supabaseProposeReplacement(client, current, mealId, proposal);
+        });
+      },
+      markLeftovers: (mealId, sourceMealId) => {
+        const current = session;
+        const visible = displayRef.current;
+        const source = visible?.meals.find((meal) => meal.id === sourceMealId);
+        if (!visible || !current || !source) {
+          return run(async () => {
+            throw new Error(!current ? "Not signed in" : "Source meal missing");
+          });
+        }
+        const proposal = {
+          title: `Leftover ${source.title}`,
+          pitch: `Same food as ${source.title}, no extra shopping trip.`,
+          prepMinutes: 15,
+          steps: ["Warm the leftovers and serve."],
+          ingredients: [],
+        };
+        return runOptimistic(`meal:${mealId}`, (snap) => patchMealProposal(snap, mealId, proposal), async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client) throw new Error("Not signed in");
+          await supabaseProposeReplacement(client, current, mealId, proposal);
+        });
+      },
       lockWeek: () =>
         run(async () => {
           const client = createSupabaseBrowserClient();
@@ -334,35 +482,71 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           await supabaseUnlockWeek(client, session, snapshot.week.id);
         }),
       toggleItem: (itemId, checked) =>
-        run(async () => {
+        runOptimistic(`item:${itemId}`, (snap) => patchItemChecked(snap, itemId, checked), async () => {
           const client = createSupabaseBrowserClient();
-          if (!client) throw new Error("Not signed in");
-          await supabaseToggleItem(client, itemId, checked);
+          if (!client) throw new Error(LIST_CHECK_SAVE_ERROR);
+          try {
+            await supabaseToggleItem(client, itemId, checked);
+          } catch {
+            throw new Error(LIST_CHECK_SAVE_ERROR);
+          }
         }),
-      updateHousehold: (patch) =>
-        run(async () => {
+      updateHousehold: (patch) => {
+        const current = session;
+        const persist = async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session) throw new Error("Not signed in");
-          await supabaseUpdateHousehold(client, session, patch);
-        }),
-      addStore: (slug, name) =>
-        run(async () => {
+          if (!client || !current) throw new Error("Not signed in");
+          await supabaseUpdateHousehold(client, current, patch);
+        };
+        if (patch.setupStep !== undefined) return run(persist);
+        return runOptimistic("household", (snap) => patchHousehold(snap, patch), persist, {
+          replace: false,
+        });
+      },
+      addStore: (slug, name) => {
+        const current = session;
+        const storedSlug = storeSlugForAdd(name, slug);
+        const tempId = `${OPTIMISTIC_STORE_PREFIX}${createId("store")}`;
+        const patchKey = `store:${storedSlug}`;
+        storePatchKeys.current.set(tempId, patchKey);
+        return runOptimistic(patchKey, (snap) => patchStoreAdded(snap, { id: tempId, name, slug: storedSlug }), async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session?.householdId) throw new Error("Not signed in");
-          const { error: insertError } = await client.from("household_stores").insert({
-            household_id: session.householdId,
-            name,
-            slug: storeSlugForAdd(name, slug),
-          });
+          if (!client || !current?.householdId) throw new Error("Not signed in");
+          const { data, error: insertError } = await client
+            .from("household_stores")
+            .insert({
+              household_id: current.householdId,
+              name,
+              slug: storedSlug,
+            })
+            .select("id")
+            .single();
           if (insertError) throw new Error(insertError.message);
-        }),
-      removeStore: (storeId) =>
-        run(async () => {
+          const realId = typeof data?.id === "string" ? data.id : null;
+          if (realId && cancelledStoreAdds.current.has(tempId)) {
+            cancelledStoreAdds.current.delete(tempId);
+            const { error: deleteError } = await client.from("household_stores").delete().eq("id", realId);
+            if (deleteError) throw new Error(deleteError.message);
+          }
+        });
+      },
+      removeStore: (storeId) => {
+        if (storeId.startsWith(OPTIMISTIC_STORE_PREFIX)) {
+          cancelledStoreAdds.current.add(storeId);
+          const patchKey = storePatchKeys.current.get(storeId);
+          if (patchKey) {
+            patchesRef.current = patchesRef.current.filter((patch) => patch.key !== patchKey);
+            publish(baseRef.current);
+          }
+          return Promise.resolve();
+        }
+        return runOptimistic(`store-remove:${storeId}`, (snap) => patchStoreRemoved(snap, storeId), async () => {
           const client = createSupabaseBrowserClient();
           if (!client) throw new Error("Not signed in");
           const { error: deleteError } = await client.from("household_stores").delete().eq("id", storeId);
           if (deleteError) throw new Error(deleteError.message);
-        }),
+        });
+      },
       createHousehold: (name) =>
         run(async () => {
           const client = createSupabaseBrowserClient();
@@ -404,5 +588,10 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
     [ready, session, snapshot, error],
   );
 
-  return <SupperContext.Provider value={value}>{children}</SupperContext.Provider>;
+  return (
+    <SupperContext.Provider value={value}>
+      {children}
+      <BallotToast message={notice ?? undefined} onDismiss={dismissNotice} alert />
+    </SupperContext.Provider>
+  );
 }

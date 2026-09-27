@@ -30,6 +30,7 @@ export function InviteShare({
   const origin = useSyncExternalStore(subscribeNever, readOrigin, readServerOrigin);
   const [shareState, setShareState] = useState<"idle" | "shared" | "copied">("idle");
   const [busy, setBusy] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const nativeShare = canUseNativeShare();
   const url = token && origin ? joinUrl(origin, token) : "";
 
@@ -75,10 +76,16 @@ export function InviteShare({
           size="fat"
           variant="outline"
           className="mt-2 w-full"
-          disabled={busy}
-          onClick={() => void onRotate()}
+          disabled={busy || rotating}
+          aria-busy={rotating}
+          onClick={() => {
+            setRotating(true);
+            void onRotate()
+              .catch(() => undefined)
+              .finally(() => setRotating(false));
+          }}
         >
-          Make a new link
+          {rotating ? "Making a new link…" : "Make a new link"}
         </Button>
       ) : null}
     </div>

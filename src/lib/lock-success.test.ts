@@ -75,7 +75,7 @@ describe("Clear Sky lock-success craft", () => {
     expect(lockBar).toContain('data-slot="lock-success-list"');
     expect(lockBar).toContain('data-slot="lock-success-recipes"');
     expect(lockBar).toContain("Lock this week");
-    expect(lockBar).toContain('import { Lock } from "lucide-react"');
+    expect(lockBar).toContain('import { Loader2, Lock } from "lucide-react"');
     expect(lockBar).toMatch(
       /variant="primary"[\s\S]*?className="w-full gap-2 shadow-float"[\s\S]*?<Lock className="size-5" \/>[\s\S]*?Lock this week/,
     );
@@ -98,8 +98,11 @@ describe("Clear Sky lock-success craft", () => {
       path.resolve(import.meta.dirname, "../components/lock-bar.tsx"),
       "utf8",
     );
-    expect(lockBar).toContain('import { Lock } from "lucide-react"');
+    expect(lockBar).toContain('import { Loader2, Lock } from "lucide-react"');
     expect(lockBar).toContain('<Lock className="size-5" />');
+    expect(lockBar).toContain('<Loader2 className="size-5 animate-spin" aria-hidden />');
+    expect(lockBar).toContain("Locking…");
+    expect(lockBar).toContain("disabled={busy}");
     expect(lockBar).toMatch(/variant="primary"[\s\S]*?className="w-full gap-2 shadow-float"/);
     expect(lockBar).not.toMatch(/data-state="ready"[\s\S]*variant="outline"/);
   });
