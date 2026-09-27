@@ -64,17 +64,26 @@ export const THEME_DARK_TOKENS = {
   ring: THEME_RING,
 } as const;
 
-/** locked chef-bot mark — HTML wordmark sits beside this PNG. */
+/** Cos chef mark — same 3D chef as marketing favicon-squircle. HTML wordmark sits beside this PNG. */
 export const BRAND_MARK_SRC = "/brand/mark-chef-bot-only.png";
 export const BRAND_ICON_180_SRC = "/brand/icon-chef-bot-only-180.png";
 export const BRAND_ICON_192_SRC = "/brand/icon-chef-bot-only-192.png";
 export const BRAND_ICON_512_SRC = "/brand/icon-chef-bot-only-512.png";
 export const BRAND_FAVICON_SRC = "/favicon.ico";
 
-/** Spec sha256 for the locked chef-bot SoT PNGs. */
+/** Spec sha256 for the Cos chef SoT PNGs (shared with marketing favicon-squircle). */
 export const BRAND_SPEC_SHA256 = {
-  mark: "fd589024cc8c1b502c482f30e8f8a582a54a7cf1dca6fd8c3f6d368ff7d739c5",
-  icon180: "57bb957af54caa556a38567706f595f4c6000a238013d4dc79b19fb65dba8e76",
-  icon192: "6bd30319af621fbd10e444f2e153aae3dc58e5ea8d52403579736ed11791d439",
-  icon512: "33d1e33ad5e5dfd256614a140baa17484044d92de16a28781e686f8ba55c4931",
+  mark: "9470e4078fce635e94c4985d6d1858739200211d5a7149360577d01e85f54a8f",
+  icon180: "31f47190fb1779e5acacdf3d2ab002820904b4d329feb2053a5bb8826a31ea45",
+  icon192: "4e8f8bd54f61bf4fa0622353f30bbd49f44f522fdf5f92377bdef76edc6018fe",
+  icon512: "9470e4078fce635e94c4985d6d1858739200211d5a7149360577d01e85f54a8f",
+  favicon: "6d13d22c9a178ccca3fe4c31fceed42cf4c026f26f8f4c64e40d966bb2d5fe00",
 } as const;
+
+/** Retired blue-robot SoT hashes — must not appear in shipped app icon bytes. */
+export const RETIRED_BLUE_ROBOT_SHA256 = [
+  "fd589024cc8c1b502c482f30e8f8a582a54a7cf1dca6fd8c3f6d368ff7d739c5",
+  "57bb957af54caa556a38567706f595f4c6000a238013d4dc79b19fb65dba8e76",
+  "6bd30319af621fbd10e444f2e153aae3dc58e5ea8d52403579736ed11791d439",
+  "33d1e33ad5e5dfd256614a140baa17484044d92de16a28781e686f8ba55c4931",
+] as const;

@@ -11,6 +11,7 @@ import {
   BRAND_ICON_512_SRC,
   BRAND_MARK_SRC,
   BRAND_SPEC_SHA256,
+  RETIRED_BLUE_ROBOT_SHA256,
   THEME_BACKGROUND,
   THEME_CARD,
   THEME_FOREGROUND,
@@ -112,7 +113,7 @@ describe("theme D Clear Sky brand tokens", () => {
     expect(css).toContain("--font-heading: var(--font-nunito)");
   });
 
-  it("points BrandMark and PWA icons at the locked chef-bot SoT", () => {
+  it("points BrandMark and PWA icons at the Cos chef SoT", () => {
     const brandMark = readFileSync(path.join(srcRoot, "components/brand-mark.tsx"), "utf8");
     const layout = readFileSync(path.join(srcRoot, "app/layout.tsx"), "utf8");
     const pwa = readFileSync(path.join(repoRoot, "scripts/write-pwa-icons.mjs"), "utf8");
@@ -147,9 +148,15 @@ describe("theme D Clear Sky brand tokens", () => {
     const shell = readFileSync(path.join(srcRoot, "components/app-shell.tsx"), "utf8");
     expect(shell).toContain("BrandMark");
     expect(shell).toContain('size="compact"');
+
+    const manifest = readFileSync(path.join(srcRoot, "app/manifest.ts"), "utf8");
+    expect(manifest).toContain("BRAND_ICON_192_SRC");
+    expect(manifest).toContain("BRAND_ICON_512_SRC");
+    expect(manifest).not.toContain("tim-locked");
+    expect(layout).not.toContain("tim-locked");
   });
 
-  it("ships the locked chef-bot SoT bytes (exact sha256)", () => {
+  it("ships the Cos chef SoT bytes (exact sha256)", () => {
     const files: Array<[string, string]> = [
       ["public/brand/mark-chef-bot-only.png", BRAND_SPEC_SHA256.mark],
       ["public/brand/icon-chef-bot-only-180.png", BRAND_SPEC_SHA256.icon180],
@@ -163,19 +170,50 @@ describe("theme D Clear Sky brand tokens", () => {
       expect(bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(true);
       expect(createHash("sha256").update(bytes).digest("hex"), rel).toBe(digest);
     }
-    expect(existsSync(path.join(repoRoot, "public/brand/icon-chef-bot-tim-192.png"))).toBe(false);
-    expect(existsSync(path.join(repoRoot, "public/brand/icon-chef-bot-tim-512.png"))).toBe(false);
+    expect(readdirSync(path.join(repoRoot, "public/brand")).sort()).toEqual([
+      "icon-chef-bot-only-180.png",
+      "icon-chef-bot-only-192.png",
+      "icon-chef-bot-only-512.png",
+      "mark-chef-bot-only.png",
+    ]);
+
+    const retiredNames = [
+      "public/brand/icon-chef-bot-tim-192.png",
+      "public/brand/icon-chef-bot-tim-512.png",
+      "public/brand/icon-tim-locked-192.png",
+      "public/brand/icon-tim-locked-512.png",
+      "public/brand/icon-tim-locked-native.png",
+      "public/brand/tim-locked-brandmark.png",
+      "public/brand/tim-locked-brandmark-header.png",
+    ];
+    for (const rel of retiredNames) {
+      expect(existsSync(path.join(repoRoot, rel)), rel).toBe(false);
+    }
 
     const favicon = readFileSync(path.join(repoRoot, "src/app/favicon.ico"));
     const publicFavicon = readFileSync(path.join(repoRoot, "public/favicon.ico"));
     const appleTouch = readFileSync(path.join(repoRoot, "public/apple-touch-icon.png"));
     const appIcon = readFileSync(path.join(repoRoot, "src/app/icon.png"));
     expect(favicon.subarray(0, 4).equals(Buffer.from([0x00, 0x00, 0x01, 0x00]))).toBe(true);
-    expect(createHash("sha256").update(favicon).digest("hex")).toBe(
-      createHash("sha256").update(publicFavicon).digest("hex"),
-    );
+    expect(createHash("sha256").update(favicon).digest("hex")).toBe(BRAND_SPEC_SHA256.favicon);
+    expect(createHash("sha256").update(publicFavicon).digest("hex")).toBe(BRAND_SPEC_SHA256.favicon);
     expect(createHash("sha256").update(appleTouch).digest("hex")).toBe(BRAND_SPEC_SHA256.icon180);
     expect(createHash("sha256").update(appIcon).digest("hex")).toBe(BRAND_SPEC_SHA256.icon192);
+
+    const iconRoots = [path.join(repoRoot, "public"), path.join(repoRoot, "src/app")];
+    const walkIcons = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const abs = path.join(dir, name);
+        if (statSync(abs).isDirectory()) {
+          walkIcons(abs);
+          continue;
+        }
+        if (!/\.(png|ico)$/i.test(name)) continue;
+        const digest = createHash("sha256").update(readFileSync(abs)).digest("hex");
+        expect(RETIRED_BLUE_ROBOT_SHA256, abs).not.toContain(digest);
+      }
+    };
+    for (const root of iconRoots) walkIcons(root);
   });
 
   it("does not ship Clear Sky / Blue & White theme pills in product UI", () => {
