@@ -21,11 +21,13 @@ export function WeekStrip({
   const cells = weekStripCells(nights);
   if (cells.length === 0) return null;
 
+  // Overlap the header by 1px with an opaque bar. --shell-head-h is integer
+  // offsetHeight, so a flush top leaves a fractional uncovered seam.
   return (
     <div
       data-slot="week-strip"
       data-locked={locked ? "true" : "false"}
-      className="sticky top-[var(--shell-head-h)] z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-md"
+      className="sticky top-[calc(var(--shell-head-h)-1px)] z-10 -mx-4 bg-background px-4 py-2"
     >
       <div role="group" aria-label="Jump to a night" className="flex gap-1">
         {cells.map((cell) => {

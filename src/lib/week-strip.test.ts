@@ -67,6 +67,10 @@ describe("This week strip", () => {
     expect(week).not.toContain("Calendar");
     expect(week).not.toContain("month-grid");
     expect(strip).toContain('data-slot="week-strip"');
+    expect(strip).toContain("top-[calc(var(--shell-head-h)-1px)]");
+    expect(strip).toContain("bg-background ");
+    expect(strip).not.toContain("bg-background/95");
+    expect(strip).not.toContain("backdrop-blur");
     expect(strip).toContain('type="button"');
     expect(strip).not.toContain("href=");
     expect(strip).not.toContain("Calendar");
