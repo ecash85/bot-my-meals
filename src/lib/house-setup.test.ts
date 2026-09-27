@@ -145,7 +145,8 @@ describe("wizard v2 house setup", () => {
       storeNames: ["Harmons", "WinCo"],
       weeklyBudgetCents: 15000,
     });
-    expect(prompt).toMatch(/dual-approve/i);
+    expect(prompt).toContain("multi-approve ballot");
+    expect(prompt).not.toContain("dual-approve");
     expect(prompt).toMatch(/plates per night/i);
     expect(prompt).toMatch(/Sun 4/);
     expect(prompt).toMatch(/Harmons/);

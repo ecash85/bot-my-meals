@@ -156,7 +156,7 @@ export function grokBotPastePrompt(input: {
       ? "no weekly dollar target"
       : `weekly meal budget about $${formatWeeklyBudgetDollars(input.weeklyBudgetCents)} (a target, not grocery prices)`;
   return [
-    `Propose a dual-approve ballot for our Bot My Meals house (${input.householdName || "our house"}).`,
+    `Propose a multi-approve ballot for our Bot My Meals house (${input.householdName || "our house"}).`,
     `Use these plates per night: ${plates}.`,
     `Shop at: ${stores}.`,
     `Budget: ${budget}.`,
