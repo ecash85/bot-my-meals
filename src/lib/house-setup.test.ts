@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { WeeklyBudgetField } from "@/components/weekly-budget-field";
 import {
   CREATE_MEALS_CTA,
   DIY_GROK_PASTE_CTA,
@@ -27,6 +30,7 @@ import {
   parseWeeklyBudgetDollars,
   previousHouseSetupStep,
   shouldShowHouseSetup,
+  weeklyBudgetCurrencyPrefix,
 } from "./house-setup";
 
 const srcRoot = path.resolve(import.meta.dirname, "..");
@@ -115,6 +119,25 @@ describe("wizard v2 house setup", () => {
     expect(formatWeeklyBudgetDollars(null)).toBe("");
   });
 
+  it("binds $ to a US ZIP and to the default path so the amount is never unitless", () => {
+    for (const postalCode of [
+      "84121",
+      "84121-1234",
+      "841211234",
+      "M5V 2T6",
+      "SW1A 1AA",
+      "SW1A1AA",
+      "",
+      "  ",
+      null,
+      undefined,
+      "??",
+      "8412",
+    ]) {
+      expect(weeklyBudgetCurrencyPrefix(postalCode)).toBe("$");
+    }
+  });
+
   it("builds a Grok paste from this house's plates, stores, and budget", () => {
     const prompt = grokBotPastePrompt({
       householdName: "Our house",
@@ -181,6 +204,8 @@ describe("house setup surfaces", () => {
     expect(wizard).toContain("HouseStores");
     expect(wizard).not.toContain("<form");
     expect(wizard).toContain("weekly-budget");
+    expect(wizard).toContain("WeeklyBudgetField");
+    expect(wizard).toContain('budget.trim() ? "Continue" : "Skip"');
     expect(wizard).toContain("CREATE_MEALS_CTA");
     expect(wizard).toContain("DIY_GROK_PASTE_CTA");
     expect(wizard).toContain("household-size");
@@ -235,5 +260,95 @@ describe("house setup surfaces", () => {
     expect(migration).toContain("values (");
     expect(migration).toContain("1,");
     expect(migration).not.toContain("seed_demo_week");
+  });
+});
+
+function expectDollarBoundToAmount(html: string, id: string, value: string) {
+  const fieldStart = html.indexOf('data-slot="weekly-budget-field"');
+  expect(fieldStart).toBeGreaterThanOrEqual(0);
+  const field = html.slice(fieldStart);
+  const prefixAt = field.indexOf('data-slot="weekly-budget-prefix"');
+  const dollarAt = field.indexOf(">$</span>");
+  const inputAt = field.indexOf(`id="${id}"`);
+  expect(prefixAt).toBeGreaterThanOrEqual(0);
+  expect(dollarAt).toBeGreaterThan(prefixAt);
+  expect(inputAt).toBeGreaterThan(dollarAt);
+  expect(field).toContain(`value="${value}"`);
+  expect(field).toContain("pl-7");
+  expect(field).not.toContain("<select");
+  expect(field).not.toMatch(/USD|EUR|GBP|currency picker/i);
+}
+
+describe("US weekly budget prefix", () => {
+  it("renders a leading $ inside the same control as the digits for a US ZIP", () => {
+    const html = renderToStaticMarkup(
+      createElement(WeeklyBudgetField, {
+        id: "weekly-budget",
+        value: "150",
+        postalCode: "84121",
+        describedBy: "weekly-budget-hint",
+        onChange: () => undefined,
+      }),
+    );
+
+    expectDollarBoundToAmount(html, "weekly-budget", "150");
+    expect(html).toContain('aria-describedby="weekly-budget-hint weekly-budget-currency"');
+    expect(html).toContain("US dollars");
+    expect(html).not.toContain("placeholder=");
+  });
+
+  it("still shows $ when zip is missing or not a US ZIP, with no currency picker", () => {
+    for (const postalCode of ["M5V 2T6", "SW1A 1AA", "", null, "??"]) {
+      const html = renderToStaticMarkup(
+        createElement(WeeklyBudgetField, {
+          id: "weekly-budget",
+          value: "150",
+          postalCode,
+          onChange: () => undefined,
+        }),
+      );
+      expectDollarBoundToAmount(html, "weekly-budget", "150");
+    }
+  });
+
+  it("locks setup step 6 and House settings to the prefixed field", () => {
+    const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");
+    const settings = readFileSync(path.join(srcRoot, "app/settings/page.tsx"), "utf8");
+    const field = readFileSync(path.join(srcRoot, "components/weekly-budget-field.tsx"), "utf8");
+    const budgetBodies = [...wizard.matchAll(/case "budget":([\s\S]*?)break;/g)].map((match) => match[1]);
+    const fieldBody = budgetBodies.find((body) => body.includes("Weekly meal budget"));
+    const footerBody = budgetBodies.find((body) => body.includes("Skip"));
+
+    expect(fieldBody).toBeTruthy();
+    expect(fieldBody).toContain("<WeeklyBudgetField");
+    expect(fieldBody).toContain('id="weekly-budget"');
+    expect(fieldBody).toContain("postalCode={household.postalCode}");
+    expect(fieldBody).toContain("{meta.helper}");
+    expect(fieldBody).toContain('htmlFor="weekly-budget"');
+    expect(fieldBody).toContain(">Weekly meal budget</Label>");
+    expect(fieldBody).not.toContain("<Input");
+    expect(fieldBody).not.toMatch(/\bUSD\b|\bEUR\b|\bGBP\b/);
+    expect(footerBody).toContain('budget.trim() ? "Continue" : "Skip"');
+    expect(wizard).not.toContain("currency picker");
+    expect(wizard).not.toContain("<select");
+
+    expect(settings).toContain("<WeeklyBudgetField");
+    expect(settings).toContain('id="house-weekly-budget"');
+    expect(settings).toContain('htmlFor="house-weekly-budget"');
+    expect(settings).toContain("postalCode={snapshot.household.postalCode}");
+    expect(settings).toContain("We never invent grocery prices.");
+    expect(settings).toContain("weeklyBudgetCurrencyPrefix");
+    expect(settings).not.toContain("<Input");
+    expect(settings).not.toContain("<select");
+
+    expect(field).toContain("weeklyBudgetCurrencyPrefix");
+    expect(field).toContain('data-slot="weekly-budget-prefix"');
+    expect(field).toContain("{prefix}");
+    expect(field).not.toContain("<select");
+    expect(HOUSE_SETUP_STEPS[5].id).toBe("budget");
+    expect(HOUSE_SETUP_STEPS[5].title).toBe("Weekly meal budget");
+    expect(HOUSE_SETUP_STEPS[5].helper).toBe(
+      "A target for dinners this week. We never invent grocery prices.",
+    );
   });
 });

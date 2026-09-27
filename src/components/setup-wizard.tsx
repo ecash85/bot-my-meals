@@ -10,8 +10,8 @@ import { InviteShare } from "@/components/invite-share";
 import { NightToggles } from "@/components/night-toggles";
 import { PeoplePerNight } from "@/components/people-per-night";
 import { useSupper } from "@/components/supper-provider";
+import { WeeklyBudgetField } from "@/components/weekly-budget-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_HEADCOUNT, MIN_HEADCOUNT } from "@/lib/headcount";
 import {
@@ -411,14 +411,12 @@ export function SetupWizard() {
             <p id="weekly-budget-hint" className="type-meta text-muted-foreground">
               {meta.helper}
             </p>
-            <Input
+            <WeeklyBudgetField
               id="weekly-budget"
-              inputMode="decimal"
               value={budget}
-              onChange={(event) => setBudgetDraft(event.target.value)}
-              className="h-12 min-h-12 rounded-[var(--radius-button)] bg-card text-base"
-              aria-describedby="weekly-budget-hint"
-              autoComplete="off"
+              postalCode={household.postalCode}
+              describedBy="weekly-budget-hint"
+              onChange={setBudgetDraft}
             />
           </div>
         </HouseCard>

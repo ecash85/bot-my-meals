@@ -13,13 +13,14 @@ import { InviteShare } from "@/components/invite-share";
 import { ManagePeople } from "@/components/manage-people";
 import { PeoplePerNight } from "@/components/people-per-night";
 import { useSupper } from "@/components/supper-provider";
+import { WeeklyBudgetField } from "@/components/weekly-budget-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   formatWeeklyBudgetDollars,
   parseWeeklyBudgetDollars,
   shouldShowHouseSetup,
+  weeklyBudgetCurrencyPrefix,
 } from "@/lib/house-setup";
 import { isAdmin, roleLabel } from "@/lib/users";
 
@@ -157,13 +158,11 @@ function SettingsBody() {
             }}
           >
             <Label htmlFor="house-weekly-budget">Weekly meal budget</Label>
-            <Input
+            <WeeklyBudgetField
               id="house-weekly-budget"
-              inputMode="decimal"
               value={budget}
-              onChange={(event) => setBudgetDraft(event.target.value)}
-              className="h-12 min-h-12 rounded-[var(--radius-button)] bg-card"
-              aria-label="Weekly meal budget"
+              postalCode={snapshot.household.postalCode}
+              onChange={setBudgetDraft}
             />
             <Button size="fat" className="w-full">
               Save budget
@@ -174,7 +173,9 @@ function SettingsBody() {
           <p className="type-body mt-3">
             {snapshot.household.weeklyBudgetCents == null
               ? "No weekly target set."
-              : `$${formatWeeklyBudgetDollars(snapshot.household.weeklyBudgetCents)}`}
+              : `${weeklyBudgetCurrencyPrefix(snapshot.household.postalCode)}${formatWeeklyBudgetDollars(
+                  snapshot.household.weeklyBudgetCents,
+                )}`}
           </p>
         )}
       </HouseCard>
