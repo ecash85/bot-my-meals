@@ -29,9 +29,12 @@ export function PeoplePerNight({
   compactOffNights?: boolean;
 }) {
   const counts = normalizeNightHeadcounts(household.nightHeadcounts, household);
-  const active = WEEKDAY_LABELS.map((label, weekday) => ({ label, weekday, count: counts[weekday] })).filter(
-    (night) => night.count > 0,
-  );
+  const nights = WEEKDAY_LABELS.map((label, weekday) => ({
+    label,
+    weekday,
+    count: counts[weekday],
+  }));
+  const visibleNights = compactOffNights ? nights.filter((night) => night.count > 0) : nights;
 
   const persistNights = (next: number[]) => {
     const nightHeadcounts = next.map(clampNightHeadcount);
@@ -66,22 +69,8 @@ export function PeoplePerNight({
       <h2 className="type-section text-primary">{title}</h2>
       <p className="type-meta mt-1 text-muted-foreground">{helper}</p>
       <ul data-slot="people-per-night" className="mt-4 space-y-2">
-        {compactOffNights
-          ? (active.length ? active : WEEKDAY_LABELS.map((label, weekday) => ({ label, weekday }))).map(
-              (night) => renderStepper(night.label, night.weekday),
-            )
-          : WEEKDAY_LABELS.map((label, weekday) => renderStepper(label, weekday))}
+        {visibleNights.map((night) => renderStepper(night.label, night.weekday))}
       </ul>
-      {compactOffNights ? (
-        <details className="mt-3" data-slot="plates-adjust">
-          <summary className="type-body min-h-12 cursor-pointer list-inside font-medium text-primary">
-            Adjust
-          </summary>
-          <ul className="mt-3 space-y-2">
-            {WEEKDAY_LABELS.map((label, weekday) => renderStepper(label, weekday))}
-          </ul>
-        </details>
-      ) : null}
     </HouseCard>
   );
 }

@@ -49,7 +49,7 @@ export const HOUSE_SETUP_STEPS = [
     id: "plates" as const,
     step: 4,
     title: "Plates per night",
-    helper: "Adjust plates on On nights only. Off nights stay 0.",
+    helper: "Defaults match your household. Change a night for guests.",
     cta: "Continue",
   },
   {

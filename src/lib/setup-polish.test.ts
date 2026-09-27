@@ -83,6 +83,7 @@ describe("setup polish copy lock", () => {
     expect(wizard).toContain("NightToggles");
     expect(wizard).toContain("hideNav");
     expect(wizard).toContain("compactOffNights");
+    expect(wizard).not.toContain("plates-adjust");
     expect(wizard).not.toContain("[1, 2, 3, 4, 5, 6, 7]");
     expect(wizard).not.toContain("nights-planned");
     expect(toggles).toContain("WEEKDAY_LABELS");

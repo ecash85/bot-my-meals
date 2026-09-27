@@ -49,7 +49,11 @@ describe("wizard v2 house setup", () => {
     expect(HOUSE_SETUP_STEPS[1].cta).toBe("Next");
     expect(HOUSE_SETUP_STEPS[2].title).toBe("Which nights get a meal?");
     expect(HOUSE_SETUP_STEPS[2].helper).toMatch(/turn nights off/i);
-    expect(HOUSE_SETUP_STEPS[3].helper).toMatch(/On nights only/);
+    expect(HOUSE_SETUP_STEPS[3].title).toBe("Plates per night");
+    expect(HOUSE_SETUP_STEPS[3].helper).toBe(
+      "Defaults match your household. Change a night for guests.",
+    );
+    expect(HOUSE_SETUP_STEPS[3].cta).toBe("Continue");
     expect(HOUSE_SETUP_STEPS[6].cta).toBe(CREATE_MEALS_CTA);
     expect(CREATE_MEALS_CTA).toBe("Create this week's meals");
     expect(WAITING_FOR_BOT).toBe("Waiting for your Bot…");
@@ -130,6 +134,35 @@ describe("wizard v2 house setup", () => {
 });
 
 describe("house setup surfaces", () => {
+  it("flattens setup plates to On-night steppers and kills Adjust chrome", () => {
+    const plates = readFileSync(path.join(srcRoot, "components/people-per-night.tsx"), "utf8");
+    const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");
+    const settings = readFileSync(path.join(srcRoot, "app/settings/page.tsx"), "utf8");
+    const managePeople = readFileSync(path.join(srcRoot, "components/manage-people.tsx"), "utf8");
+
+    expect(wizard).toContain('title="Plates per night"');
+    expect(wizard).toContain("helper={meta.helper}");
+    expect(wizard).toContain("compactOffNights");
+    expect(wizard).toMatch(/case "plates"[\s\S]*?Continue/);
+    expect(plates).toContain('data-slot="people-per-night"');
+    expect(plates).toContain('"night-stepper"');
+    expect(plates).toContain("size-12");
+    expect(plates).toContain("min-h-12");
+    expect(plates).toContain("compactOffNights");
+    expect(plates).toMatch(/count > 0/);
+    expect(plates).not.toContain("plates-adjust");
+    expect(plates).not.toContain("<details");
+    expect(plates).not.toContain("<summary");
+    expect(plates).not.toMatch(/\bAdjust\b/);
+    expect(plates).not.toContain("Adjust weekly");
+    expect(settings).toContain("PeoplePerNight");
+    expect(settings).not.toContain("compactOffNights");
+    expect(settings).not.toContain("plates-adjust");
+    expect(settings).not.toMatch(/\bAdjust weekly\b/);
+    expect(managePeople).not.toContain("plates-adjust");
+    expect(managePeople).not.toMatch(/\bAdjust weekly\b/);
+  });
+
   it("gates This week on unfinished Admin setup and keeps progress in the household row", () => {
     const week = readFileSync(path.join(srcRoot, "app/week/page.tsx"), "utf8");
     const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");

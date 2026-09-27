@@ -21,6 +21,9 @@ describe("House Clear Sky kit", () => {
     expect(source).toContain("size-12");
     expect(source).toContain("shadow-card");
     expect(source).not.toContain("Typical week");
+    expect(source).not.toContain("plates-adjust");
+    expect(source).not.toContain("<details");
+    expect(source).not.toMatch(/\bAdjust\b/);
   });
 
   it("uses 48px member-row actions and kit type", () => {
