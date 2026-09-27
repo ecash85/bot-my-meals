@@ -464,16 +464,12 @@ export function SetupWizard() {
       hideNav
       footer={<div data-slot="setup-cta" className="space-y-2">{footer}</div>}
     >
-      <form
-        data-slot="setup-wizard"
-        className="flex min-h-0 flex-1 flex-col"
-        onSubmit={(event) => event.preventDefault()}
-      >
+      <div data-slot="setup-wizard" className="flex min-h-0 flex-1 flex-col">
         <p className="type-eyebrow text-primary">{SETUP_TITLE}</p>
         <p className="type-meta mt-1 text-muted-foreground">{SETUP_HELPER}</p>
         <div className="mt-4">{body}</div>
         {error ? <p className="type-meta mt-3 text-destructive">{error}</p> : null}
-      </form>
+      </div>
     </AppShell>
   );
 }

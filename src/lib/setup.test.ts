@@ -78,6 +78,7 @@ describe("setup surfaces", () => {
     expect(wizard).toContain("InviteShare");
     expect(wizard).toContain("PeoplePerNight");
     expect(wizard).toContain("HouseStores");
+    expect(wizard).not.toContain("<form");
     expect(wizard).toContain("weekly-budget");
     expect(wizard).toContain('size="fat"');
     expect(wizard).toContain('data-slot="setup-cta"');
