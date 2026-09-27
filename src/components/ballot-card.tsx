@@ -35,6 +35,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { mealCardControlId } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 export function BallotCard({
@@ -68,6 +69,7 @@ export function BallotCard({
   const [reason, setReason] = useState(swapNote ?? "");
   const [busy, setBusy] = useState(false);
   const canAct = Boolean(onSwap || onRemove) && !locked;
+  const swapFieldId = mealCardControlId("swap-reason", dayLabel);
 
   const sendSwap = async () => {
     if (!onSwap) return;
@@ -103,8 +105,9 @@ export function BallotCard({
       )}
     >
       <p
+        data-slot="meal-day-label"
         className={cn(
-          "type-eyebrow",
+          "type-day-label",
           muted ? "text-secondary-foreground/70" : "text-muted-foreground",
         )}
       >
@@ -195,11 +198,11 @@ export function BallotCard({
             <SheetDescription className="type-body">{SWAP_SHEET_HELPER}</SheetDescription>
           </SheetHeader>
           <div className="space-y-2 px-4">
-            <Label htmlFor={`swap-reason-${dayLabel}`} className="type-meta text-muted-foreground">
+            <Label htmlFor={swapFieldId} className="type-meta text-muted-foreground">
               {SWAP_SHEET_REASON_LABEL}
             </Label>
             <Textarea
-              id={`swap-reason-${dayLabel}`}
+              id={swapFieldId}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder={SWAP_SHEET_PLACEHOLDER}

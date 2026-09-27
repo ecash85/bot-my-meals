@@ -12,6 +12,8 @@ export const WEEKDAY_LABELS = [
 
 export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
 export function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -57,6 +59,22 @@ export function formatWeekRange(startsOn: string): string {
 export function formatWeekEyebrow(startsOn: string, locked = false): string {
   const range = formatWeekRange(startsOn);
   return locked ? `${range} · Locked` : range;
+}
+
+/** This week meal-card kicker: `Sun · Sep 27`. Month stays on the card when a week spans two months. */
+export function formatMealCardDayLabel(iso: string): string {
+  const date = parseISODate(iso);
+  const weekday = WEEKDAY_SHORT[date.getDay()];
+  const month = MONTH_ABBR[date.getMonth()];
+  return `${weekday} · ${month} ${date.getDate()}`;
+}
+
+export function mealCardControlId(prefix: string, dayLabel: string): string {
+  const slug = dayLabel
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${prefix}-${slug || "night"}`;
 }
 
 export function weekdayShortFromNight(nightDate: string): string {

@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { mealCardControlId } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 export function EmptyDayCard({
@@ -48,6 +49,7 @@ export function EmptyDayCard({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const noteFieldId = mealCardControlId("add-note", dayLabel);
 
   const requestDinner = async () => {
     if (!onAdd) return;
@@ -85,8 +87,9 @@ export function EmptyDayCard({
       )}
     >
       <p
+        data-slot="meal-day-label"
         className={cn(
-          "type-eyebrow",
+          "type-day-label",
           state === "locked" ? "text-secondary-foreground/70" : "text-muted-foreground",
         )}
       >
@@ -143,11 +146,11 @@ export function EmptyDayCard({
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-2 px-4">
-            <Label htmlFor={`add-note-${dayLabel}`} className="type-meta text-muted-foreground">
+            <Label htmlFor={noteFieldId} className="type-meta text-muted-foreground">
               {ADD_SHEET_NOTE_LABEL}
             </Label>
             <Textarea
-              id={`add-note-${dayLabel}`}
+              id={noteFieldId}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={ADD_SHEET_PLACEHOLDER}

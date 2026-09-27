@@ -203,6 +203,14 @@
   text-transform: uppercase;
 }
 
+@utility type-day-label {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
 @utility type-nav {
   font-size: 11px;
   line-height: 14px;

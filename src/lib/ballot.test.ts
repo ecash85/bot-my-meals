@@ -192,6 +192,10 @@ describe("Clear Sky ballot craft", () => {
     expect(card).toMatch(/size="vote"[\s\S]*?className="gap-2"[\s\S]*?Remove/);
     expect(card).toMatch(/>\s*Swap\s*</);
     expect(card).toMatch(/>\s*Remove\s*</);
+    expect(card).toContain('data-slot="meal-day-label"');
+    expect(card).toContain("type-day-label");
+    expect(empty).toContain('data-slot="meal-day-label"');
+    expect(week).toContain("formatMealCardDayLabel");
     expect(card).toContain("SWAP_SHEET_TITLE");
     expect(card).toContain("SWAP_SHEET_SEND");
     expect(card).toContain('className="flex-row gap-2"');
