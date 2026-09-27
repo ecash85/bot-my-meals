@@ -141,6 +141,18 @@ export type Week = {
   lockedAt: string | null;
 };
 
+/** Title-only dinner kept after a week finishes. No recipe payload. */
+export type MealHistoryNight = {
+  nightDate: string;
+  title: string;
+  plates: number | null;
+};
+
+export type MealHistoryWeek = {
+  startsOn: string;
+  nights: MealHistoryNight[];
+};
+
 export type ShoppingItem = {
   id: string;
   householdId: string;
@@ -223,6 +235,7 @@ export type HouseholdSnapshot = {
   pendingInvites?: PendingInvite[];
   joinToken?: string | null;
   ballotRequest?: BallotRequest | null;
+  mealHistory: MealHistoryWeek[];
 };
 
 export type ReplacementIdea = {

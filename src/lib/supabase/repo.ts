@@ -42,6 +42,7 @@ import {
   headcountForNight,
   normalizeNightHeadcounts,
 } from "@/lib/headcount";
+import { parseMealHistory } from "@/lib/meal-history";
 import { redactUntilLocked } from "@/lib/visibility";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -135,6 +136,7 @@ export async function fetchSupabaseSnapshot(
     invitesRes,
     joinTokenRes,
     ballotRequestRes,
+    historyRes,
   ] = await Promise.all([
     client.from("households").select("*").eq("id", householdId).single(),
     client.from("memberships").select("*").eq("household_id", householdId),
@@ -168,6 +170,7 @@ export async function fetchSupabaseSnapshot(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    client.rpc("meal_history"),
   ]);
 
   const householdRow = required(householdRes.data, householdRes.error, "Household not found");
@@ -338,6 +341,7 @@ export async function fetchSupabaseSnapshot(
     ),
     joinToken: joinTokenRes.error ? null : (joinTokenRes.data?.token ?? null),
     ballotRequest: mapBallotRequest(ballotRequestRes.data, ballotRequestRes.error, week.id),
+    mealHistory: parseMealHistory(historyRes.error ? null : historyRes.data),
   };
 
   return redactUntilLocked(snapshot);

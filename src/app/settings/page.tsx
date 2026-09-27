@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { AppearancePicker } from "@/components/appearance-picker";
 import { BotCheckFrequency } from "@/components/bot-check-frequency";
 import { AppShell } from "@/components/app-shell";
@@ -23,6 +24,7 @@ import {
   shouldShowHouseSetup,
   weeklyBudgetCurrencyPrefix,
 } from "@/lib/house-setup";
+import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
 import { isAdmin, roleLabel } from "@/lib/users";
 
 export default function SettingsPage() {
@@ -92,6 +94,15 @@ function SettingsBody() {
       </HouseCard>
 
       <AppearancePicker />
+
+      <Link
+        href="/settings/history"
+        data-slot="past-weeks-row"
+        className="mt-6 flex min-h-12 items-center justify-between rounded-[14px] bg-card px-5 shadow-card"
+      >
+        <span className="type-section text-primary">{PAST_WEEKS_LABEL}</span>
+        <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+      </Link>
 
       {shouldShowHouseSetup(session?.role, snapshot.household.setupStep) ? (
         <HouseCard className="mt-6">

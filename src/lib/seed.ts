@@ -298,6 +298,7 @@ export function emptyHousehold(name: string, owner?: UserProfile): HouseholdSnap
     recipes: [],
     shoppingList: null,
     pendingInvites: [],
+    mealHistory: [],
   };
 }
 

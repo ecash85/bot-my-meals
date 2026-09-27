@@ -28,6 +28,7 @@ import {
 } from "@/lib/ballot";
 import { botCheckForSnapshot } from "@/lib/bot-check";
 import { formatMealCardDayLabel, formatWeekRange, toISODate, weekdayLabelFromNight } from "@/lib/dates";
+import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
 import { focusNightCard, nightCardAnchorId } from "@/lib/week-strip";
 import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
 import { recipeNightsForWeek } from "@/lib/recipes";
@@ -130,6 +131,17 @@ function WeekBallot() {
           })}
         </div>
       )}
+      {snapshot.mealHistory.length > 0 ? (
+        <p className="mt-6 text-center">
+          <Link
+            href="/settings/history"
+            data-slot="past-weeks-link"
+            className="type-meta text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4"
+          >
+            {PAST_WEEKS_LABEL}
+          </Link>
+        </p>
+      ) : null}
       <BallotToast message={toast} onDismiss={dismissToast} />
     </AppShell>
   );
