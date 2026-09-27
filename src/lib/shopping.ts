@@ -67,15 +67,17 @@ export function buildShoppingItems(input: {
   }));
 }
 
-/** Locked-list sticky headers — Trader Joe’s / Smith’s only. Never Kroger or a cart. */
+/** Locked-list sticky headers — Trader Joe’s / Smith’s only. Never a cart. */
 export const STORE_LABEL_TRADER_JOES = "Trader Joe's";
 export const STORE_LABEL_SMITHS = "Smith's";
 
 export function listStoreLabel(store: Pick<Store, "slug">): string | null {
   switch (store.slug) {
     case "trader-joes":
+    case "trader-joe-s":
       return STORE_LABEL_TRADER_JOES;
     case "smiths":
+    case "smith-s":
       return STORE_LABEL_SMITHS;
     default:
       return null;
@@ -97,7 +99,7 @@ export function groupItemsByStore(
     .filter((group) => group.items.length > 0);
 }
 
-/** Post-lock sticky sections: known stores only, canonical labels. */
+/** Post-lock sticky sections. Catalog slugs, plus apostrophe slugs saved before the picker passed a slug. */
 export function groupStickyStoreLists(
   items: ShoppingItem[],
   stores: Store[],

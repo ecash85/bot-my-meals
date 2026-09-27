@@ -145,7 +145,7 @@ function SettingsBody() {
         canEdit={owner}
         postalCode={snapshot.household.postalCode}
         onPostalCode={(code) => void updateHousehold({ postalCode: code || null })}
-        onAdd={(name) => void addStore(name)}
+        onAdd={(slug, name) => void addStore(slug, name)}
         onRemove={(id) => void removeStore(id)}
       />
 

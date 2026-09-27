@@ -141,6 +141,8 @@ describe("sticky store labels", () => {
   it("labels Trader Joe's and Smith's only — never Kroger or a third store", () => {
     expect(listStoreLabel({ slug: "trader-joes" })).toBe(STORE_LABEL_TRADER_JOES);
     expect(listStoreLabel({ slug: "smiths" })).toBe(STORE_LABEL_SMITHS);
+    expect(listStoreLabel({ slug: "trader-joe-s" })).toBe(STORE_LABEL_TRADER_JOES);
+    expect(listStoreLabel({ slug: "smith-s" })).toBe(STORE_LABEL_SMITHS);
     expect(listStoreLabel({ slug: "kroger" })).toBeNull();
     expect(listStoreLabel({ slug: "costco" })).toBeNull();
     expect(STORE_LABEL_TRADER_JOES).toBe("Trader Joe's");
@@ -202,6 +204,72 @@ describe("sticky store labels", () => {
     expect(JSON.stringify(groups)).not.toContain("Kroger");
     expect(JSON.stringify(groups)).not.toContain("Milk");
     expect(JSON.stringify(groups)).not.toContain("399");
+  });
+
+  it("renders items when the store slug is the apostrophe form smith-s", () => {
+    const slug = "Smith's".toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    expect(slug).toBe("smith-s");
+    const stores: Store[] = [
+      { id: "smiths-store", householdId: "h", name: "Smith's", slug, sortOrder: 0 },
+      { id: "tj-store", householdId: "h", name: "Trader Joe's", slug: "trader-joe-s", sortOrder: 1 },
+    ];
+    const items: ShoppingItem[] = [
+      {
+        id: "1",
+        householdId: "h",
+        shoppingListId: "l",
+        storeId: "smiths-store",
+        name: "Chicken thighs",
+        quantity: 1.5,
+        unit: "lb",
+        priceCents: null,
+        priceSource: null,
+        pricedAt: null,
+        checked: false,
+      },
+      {
+        id: "2",
+        householdId: "h",
+        shoppingListId: "l",
+        storeId: "smiths-store",
+        name: "Yellow onion",
+        quantity: 1,
+        unit: "ct",
+        priceCents: null,
+        priceSource: null,
+        pricedAt: null,
+        checked: false,
+      },
+      {
+        id: "3",
+        householdId: "h",
+        shoppingListId: "l",
+        storeId: "tj-store",
+        name: "Salsa",
+        quantity: 1,
+        unit: "jar",
+        priceCents: null,
+        priceSource: null,
+        pricedAt: null,
+        checked: false,
+      },
+    ];
+
+    const groups = groupStickyStoreLists(items, stores);
+    expect(groups.map((group) => group.label)).toEqual(["Smith's", "Trader Joe's"]);
+    expect(groups[0]?.items.map((item) => item.name)).toEqual(["Chicken thighs", "Yellow onion"]);
+    expect(groups[1]?.items.map((item) => item.name)).toEqual(["Salsa"]);
+  });
+
+  it("rewrites apostrophe store slugs to the catalog slugs", () => {
+    const sql = readFileSync(
+      path.resolve(import.meta.dirname, "../../supabase/migrations/20260927190000_normalize_store_slugs.sql"),
+      "utf8",
+    );
+    expect(sql).toContain("set slug = 'smiths'");
+    expect(sql).toContain("bad.slug = 'smith-s'");
+    expect(sql).toContain("set slug = 'trader-joes'");
+    expect(sql).toContain("bad.slug = 'trader-joe-s'");
   });
 });
 

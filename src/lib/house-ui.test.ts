@@ -20,14 +20,15 @@ describe("House Clear Sky kit", () => {
     const week = readFileSync(path.join(srcRoot, "app/week/page.tsx"), "utf8");
 
     expect(source).toContain("addCustomStore");
-    expect(source).toContain("void onAdd(name)");
+    expect(source).toContain("onAdd(grocer.slug, grocer.name)");
+    expect(source).toContain("storeSlugForAdd(name)");
     expect(source).toContain('<Button type="button" size="fat" onClick={() => addCustomStore()}>');
     expect(source).toContain('if (event.key !== "Enter") return');
     expect(source).toContain("event.preventDefault()");
     expect(source).not.toContain("<form");
     expect(wizard).toContain('<div data-slot="setup-wizard"');
     expect(wizard).not.toContain("<form");
-    expect(wizard).toContain("onAdd={(name) => void addStore(name)}");
+    expect(wizard).toContain("onAdd={(slug, name) => void addStore(slug, name)}");
     expect(wizard).not.toMatch(/onAdd=\{[^}]*advance/);
     expect(wizard).toContain("onClick={() =>");
     expect(wizard).toContain("void advance(");

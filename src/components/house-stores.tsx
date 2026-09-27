@@ -10,6 +10,7 @@ import {
   grocersForPostalCode,
   normalizePostalCode,
   storeMatchesGrocer,
+  storeSlugForAdd,
 } from "@/lib/grocers";
 import type { Store } from "@/lib/types";
 
@@ -27,7 +28,7 @@ export function HouseStores({
   helper?: string;
   postalCode?: string | null;
   onPostalCode?: (code: string) => void | Promise<void>;
-  onAdd: (name: string) => void | Promise<void>;
+  onAdd: (slug: string, name: string) => void | Promise<void>;
   onRemove: (storeId: string) => void | Promise<void>;
 }) {
   const [storeName, setStoreName] = useState("");
@@ -44,7 +45,7 @@ export function HouseStores({
   const addCustomStore = () => {
     const name = storeName.trim();
     if (!name) return;
-    void onAdd(name);
+    void onAdd(storeSlugForAdd(name), name);
     setStoreName("");
   };
 
@@ -90,7 +91,7 @@ export function HouseStores({
                       if (match) void onRemove(match.id);
                       return;
                     }
-                    void onAdd(grocer.name);
+                    void onAdd(grocer.slug, grocer.name);
                   }}
                 >
                   {grocer.name}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  catalogSlugForName,
   classifyPostalCode,
   grocersForPostalCode,
   normalizePostalCode,
   storeMatchesGrocer,
+  storeSlugForAdd,
 } from "./grocers";
 
 describe("static regional grocers", () => {
@@ -35,6 +37,16 @@ describe("static regional grocers", () => {
     expect(encoded).not.toContain("$");
     expect(encoded.toLowerCase()).not.toContain("cart");
     expect(encoded.toLowerCase()).not.toContain("price");
+  });
+
+  it("stores curated grocers under the catalog slug, not an apostrophe slug", () => {
+    expect(catalogSlugForName("Smith's")).toBe("smiths");
+    expect(catalogSlugForName("Trader Joe's")).toBe("trader-joes");
+    expect(catalogSlugForName("Smith’s")).toBe("smiths");
+    expect(storeSlugForAdd("Smith's", "smith-s")).toBe("smiths");
+    expect(storeSlugForAdd("Trader Joe's", "trader-joe-s")).toBe("trader-joes");
+    expect(storeSlugForAdd("Corner market")).toBe("corner-market");
+    expect(catalogSlugForName("Corner market")).toBeNull();
   });
 
   it("matches selected grocers by slug or name", () => {

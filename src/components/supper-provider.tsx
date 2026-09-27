@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured } from "@/lib/config";
+import { storeSlugForAdd } from "@/lib/grocers";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -64,7 +65,7 @@ type SupperContextValue = {
   unlockWeek: () => Promise<void>;
   toggleItem: (itemId: string, checked: boolean) => Promise<void>;
   updateHousehold: (patch: HouseholdSettingsPatch) => Promise<void>;
-  addStore: (name: string) => Promise<void>;
+  addStore: (slug: string, name: string) => Promise<void>;
   removeStore: (storeId: string) => Promise<void>;
   createHousehold: (name: string) => Promise<void>;
   joinHousehold: (code: string, email?: string) => Promise<void>;
@@ -344,15 +345,14 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client || !session) throw new Error("Not signed in");
           await supabaseUpdateHousehold(client, session, patch);
         }),
-      addStore: (name) =>
+      addStore: (slug, name) =>
         run(async () => {
           const client = createSupabaseBrowserClient();
           if (!client || !session?.householdId) throw new Error("Not signed in");
-          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
           const { error: insertError } = await client.from("household_stores").insert({
             household_id: session.householdId,
             name,
-            slug,
+            slug: storeSlugForAdd(name, slug),
           });
           if (insertError) throw new Error(insertError.message);
         }),

@@ -1,3 +1,5 @@
+import { slugify } from "./ids";
+
 export type Grocer = {
   slug: string;
   name: string;
@@ -301,6 +303,40 @@ export function storeMatchesGrocer(
 ): boolean {
   return (
     store.slug === grocer.slug ||
-    store.name.trim().toLowerCase() === grocer.name.trim().toLowerCase()
+    normalizeStoreName(store.name) === normalizeStoreName(grocer.name)
   );
+}
+
+function allCatalogGrocers(): Grocer[] {
+  return uniqueGrocers([
+    NATIONAL_GROCERS,
+    ...Object.values(US_BY_FIRST_DIGIT),
+    ...Object.values(US_BY_ZIP3),
+    ...Object.values(CA_BY_LETTER),
+    UK_GROCERS,
+  ]);
+}
+
+function normalizeStoreName(name: string): string {
+  return name.trim().toLowerCase().replace(/[\u2018\u2019]/g, "'");
+}
+
+/** Catalog slug for a curated grocer name. Null for a household-typed store. */
+export function catalogSlugForName(name: string): string | null {
+  const normalized = normalizeStoreName(name);
+  if (!normalized) return null;
+  const match = allCatalogGrocers().find((grocer) => normalizeStoreName(grocer.name) === normalized);
+  return match?.slug ?? null;
+}
+
+/**
+ * Slug to store. A curated name always wins (`Smith's` → `smiths`), even when
+ * the caller slugified the apostrophe into `smith-s`.
+ */
+export function storeSlugForAdd(name: string, slug?: string): string {
+  const catalog = catalogSlugForName(name);
+  if (catalog) return catalog;
+  const provided = slug?.trim();
+  if (provided) return provided;
+  return slugify(name);
 }
