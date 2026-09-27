@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { BallotCard } from "@/components/ballot-card";
+import { WaitingBotCheck } from "@/components/bot-check-frequency";
 import { BallotToast } from "@/components/ballot-toast";
 import { EmptyDayCard } from "@/components/empty-day-card";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -23,6 +24,7 @@ import {
   weekNightPresentation,
   type EmptyWeekAction,
 } from "@/lib/ballot";
+import { botCheckForSnapshot } from "@/lib/bot-check";
 import { formatWeekRange, weekdayLabelFromNight, weekdayShortFromNight } from "@/lib/dates";
 import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
 import { recipeNightsForWeek } from "@/lib/recipes";
@@ -57,6 +59,7 @@ function WeekBallot() {
   if (!snapshot) return null;
 
   const locked = snapshot.week.status === "locked";
+  const botCheck = botCheckForSnapshot(snapshot);
   const check = checkWeekLock(snapshot.meals, snapshot.votes, snapshot.memberships);
   const canVote = Boolean(session?.membershipId) && canActOnBallot(session?.role) && !locked;
   const nights = recipeNightsForWeek(snapshot.meals);
@@ -79,6 +82,7 @@ function WeekBallot() {
         <EmptyWeek onCreateMeals={() => requestWeekBallot()} />
       ) : (
         <div className="space-y-3">
+          <WaitingBotCheck status={botCheck} pendingWorkOnly className="mb-1" />
           {nights.map((meal) => {
             const weekday = weekdayShortFromNight(meal.nightDate);
             const dayName = weekdayLabelFromNight(meal.nightDate);
@@ -195,6 +199,7 @@ function EmptyWeek({ onCreateMeals }: { onCreateMeals: () => Promise<string> }) 
   const { session, snapshot } = useSupper();
   const [creating, setCreating] = useState(false);
   const setupIncomplete = !isHouseSetupComplete(snapshot?.household.setupStep ?? 8);
+  const botCheck = snapshot ? botCheckForSnapshot(snapshot) : null;
   const copy = emptyWeekPresentation({
     setupIncomplete,
     ballotStatus: snapshot?.ballotRequest?.status ?? null,
@@ -216,6 +221,9 @@ function EmptyWeek({ onCreateMeals }: { onCreateMeals: () => Promise<string> }) 
           setCreating(false);
         }
       })}
+      {copy.action === "waiting" && botCheck ? (
+        <WaitingBotCheck status={botCheck} checkNowWhenIdle className="mt-4" />
+      ) : null}
     </div>
   );
 }

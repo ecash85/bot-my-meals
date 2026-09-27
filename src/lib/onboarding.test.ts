@@ -56,6 +56,7 @@ describe("create household cannot fail silently", () => {
     expect(readme).toContain(grant);
     expect(readme).toContain(setup);
     expect(readme).toContain(wizardV2);
-    expect(readme).toMatch(/all eight/);
+    expect(readme).toMatch(/all nine/);
+    expect(readme).toContain("20260927040000_bot_check_cadence.sql");
   });
 });

@@ -19,6 +19,13 @@ import type {
 import type { MemberDraft } from "@/lib/users";
 import { voteNotePersists } from "@/lib/ballot";
 import {
+  botCheckForSnapshot,
+  botCheckUpdateColumns,
+  normalizeBotCheckSetting,
+  type BotCheckMeal,
+  type BotCheckStatus,
+} from "@/lib/bot-check";
+import {
   clampHouseSetupStep,
   clampHouseholdSize,
   clampNightsPlanned,
@@ -165,6 +172,10 @@ export async function fetchSupabaseSnapshot(
 
   const householdRow = required(householdRes.data, householdRes.error, "Household not found");
   const weekRow = required(weekRes.data, weekRes.error, "This household has no week yet.");
+  const botCheck = normalizeBotCheckSetting(
+    householdRow.bot_check_mode,
+    householdRow.bot_check_interval_hours,
+  );
 
   const meals: Meal[] = (mealsRes.data ?? [])
     .filter((row) => row.week_id === weekRow.id)
@@ -289,6 +300,8 @@ export async function fetchSupabaseSnapshot(
         typeof householdRow.postal_code === "string" && householdRow.postal_code.trim()
           ? householdRow.postal_code
           : null,
+      botCheckMode: botCheck.mode,
+      botCheckIntervalHours: botCheck.intervalHours,
     },
     memberships: (membersRes.data ?? []).map(
       (row): Membership => ({
@@ -498,6 +511,7 @@ export async function supabaseUpdateHousehold(
         ? {}
         : { nights_planned: clampNightsPlanned(patch.nightsPlanned) }),
       ...(patch.postalCode === undefined ? {} : { postal_code: patch.postalCode }),
+      ...botCheckUpdateColumns(patch),
       ...(nightHeadcounts
         ? { nights_planned: nightsPlannedFromHeadcounts(nightHeadcounts) }
         : {}),
@@ -649,4 +663,178 @@ export async function supabaseRequestWeekBallot(client: SupabaseClient) {
   if (error) throw new Error(error.message);
   if (typeof data !== "string" || !data) throw new Error("Could not create this week's meals request.");
   return data;
+}
+
+export type BotCheckStatusResult =
+  | { ok: true; body: BotCheckStatus }
+  | { ok: false; error: "unauthorized" | "no_household" };
+
+const BOT_STATUS_HOUSEHOLD_COLUMNS =
+  "bot_check_mode, bot_check_interval_hours, setup_step, household_size, night_headcounts, couple_nights, family_size, couple_size";
+
+function asRole(value: unknown): Role | null {
+  switch (value) {
+    case "owner":
+    case "voter":
+    case "eater":
+      return value;
+    default:
+      return null;
+  }
+}
+
+/** Cheap quiet-wake read. No recipes, shopping rows, or full snapshot. */
+export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<BotCheckStatusResult> {
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError || !userData.user) return { ok: false, error: "unauthorized" };
+
+  const { data: membership, error: membershipError } = await client
+    .from("memberships")
+    .select("household_id")
+    .eq("user_id", userData.user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (membershipError) throw new Error(membershipError.message);
+  if (!membership?.household_id) return { ok: false, error: "no_household" };
+
+  const householdId = String(membership.household_id);
+  const { data: householdRow, error: householdError } = await client
+    .from("households")
+    .select(BOT_STATUS_HOUSEHOLD_COLUMNS)
+    .eq("id", householdId)
+    .single();
+  if (householdError || !householdRow) {
+    throw new Error(householdError?.message ?? "Household not found");
+  }
+
+  const { data: week, error: weekError } = await client
+    .from("weeks")
+    .select("id")
+    .eq("household_id", householdId)
+    .order("starts_on", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (weekError) throw new Error(weekError.message);
+
+  let ballot: {
+    status: NonNullable<ReturnType<typeof parseBallotRequestStatus>>;
+    householdSize: number;
+    nightHeadcounts: number[];
+  } | null = null;
+  let meals: BotCheckMeal[] = [];
+  let votes: Vote[] = [];
+  let members: Membership[] = [];
+
+  if (week?.id) {
+    const [ballotRes, mealsRes] = await Promise.all([
+      client
+        .from("ballot_requests")
+        .select("status, household_size, night_headcounts")
+        .eq("household_id", householdId)
+        .eq("week_id", week.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      client
+        .from("meals")
+        .select("id, title, servings, night_date")
+        .eq("household_id", householdId)
+        .eq("week_id", week.id),
+    ]);
+    if (ballotRes.error) throw new Error(ballotRes.error.message);
+    if (mealsRes.error) throw new Error(mealsRes.error.message);
+
+    const status = parseBallotRequestStatus(ballotRes.data?.status);
+    if (ballotRes.data && status) {
+      ballot = {
+        status,
+        householdSize: clampHouseholdSize(ballotRes.data.household_size),
+        nightHeadcounts: normalizeNightHeadcounts(
+          Array.isArray(ballotRes.data.night_headcounts)
+            ? (ballotRes.data.night_headcounts as number[])
+            : null,
+        ),
+      };
+    }
+
+    meals = (mealsRes.data ?? []).map((row) => ({
+      id: String(row.id),
+      title: String(row.title ?? ""),
+      servings: Number(row.servings),
+      nightDate: String(row.night_date),
+    }));
+
+    if (meals.length) {
+      const mealIds = meals.map((meal) => meal.id);
+      const [votesRes, membersRes] = await Promise.all([
+        client
+          .from("votes")
+          .select("id, meal_id, membership_id, choice, updated_at")
+          .eq("household_id", householdId)
+          .in("meal_id", mealIds),
+        client.from("memberships").select("id, role").eq("household_id", householdId),
+      ]);
+      if (votesRes.error) throw new Error(votesRes.error.message);
+      if (membersRes.error) throw new Error(membersRes.error.message);
+      members = (membersRes.data ?? []).flatMap((row) => {
+        const role = asRole(row.role);
+        if (!role) return [];
+        return [
+          {
+            id: String(row.id),
+            householdId,
+            userId: "",
+            role,
+            displayName: "",
+            email: "",
+          },
+        ];
+      });
+      votes = (votesRes.data ?? []).flatMap((row) => {
+        const choice = migrateVoteChoice(row.choice);
+        if (!choice) return [];
+        return [
+          {
+            id: String(row.id),
+            householdId,
+            mealId: String(row.meal_id),
+            membershipId: String(row.membership_id),
+            choice,
+            note: "",
+            updatedAt: String(row.updated_at ?? ""),
+          },
+        ];
+      });
+    }
+  }
+
+  const botCheck = normalizeBotCheckSetting(
+    householdRow.bot_check_mode,
+    householdRow.bot_check_interval_hours,
+  );
+
+  return {
+    ok: true,
+    body: botCheckForSnapshot({
+      household: {
+        botCheckMode: botCheck.mode,
+        botCheckIntervalHours: botCheck.intervalHours,
+        setupStep: clampHouseSetupStep(householdRow.setup_step ?? 8),
+        householdSize: clampHouseholdSize(householdRow.household_size ?? householdRow.family_size),
+        nightHeadcounts: normalizeNightHeadcounts(householdRow.night_headcounts, {
+          coupleNights: householdRow.couple_nights,
+          familySize: householdRow.family_size,
+          coupleSize: householdRow.couple_size,
+        }),
+        coupleNights: Array.isArray(householdRow.couple_nights) ? householdRow.couple_nights : [],
+        familySize: Number(householdRow.family_size) || 4,
+        coupleSize: Number(householdRow.couple_size) || 2,
+      },
+      meals,
+      votes,
+      memberships: members,
+      ballotRequest: ballot,
+    }),
+  };
 }

@@ -103,7 +103,7 @@ A Las Vegas-adjacent region (`us-west-1`) is fine.
 
 ### 4. Run every migration, in filename order
 
-The app needs **all eight** files under [`supabase/migrations/`](supabase/migrations/). Paste each into the Supabase SQL Editor and run it, in this order — or use `supabase db push` if the CLI is already linked to this project.
+The app needs **all nine** files under [`supabase/migrations/`](supabase/migrations/). Paste each into the Supabase SQL Editor and run it, in this order — or use `supabase db push` if the CLI is already linked to this project.
 
 1. `supabase/migrations/20260902120000_init.sql`
 2. `supabase/migrations/20260909120000_night_headcounts.sql`
@@ -113,8 +113,9 @@ The app needs **all eight** files under [`supabase/migrations/`](supabase/migrat
 6. `supabase/migrations/20260917120000_grant_private_schema_usage.sql`
 7. `supabase/migrations/20260917140000_house_setup_join_tokens.sql`
 8. `supabase/migrations/20260917160000_wizard_v2_ballot_request.sql`
+9. `supabase/migrations/20260927040000_bot_check_cadence.sql`
 
-Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create).
+Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create). File 9 stores Bot check frequency (`bot_check_mode` defaults to `adaptive`; fixed checks use `bot_check_interval_hours` of 1, 3, or 6).
 
 ### 5. Auth: Email magic link, then lock the Site URL
 
@@ -190,7 +191,9 @@ Walk through house setup (no Seed / sample week). Progress is **Setup · step N 
 6. **Optional** weekly meal budget (or skip).
 7. Tap **Create this week's meals** — app writes a ballot request and shows **Waiting for your Bot…** until the ballot appears. **Copy paste for your Grok Bot** is DIY fallback only (collapsed).
 
-Empty This week: **Finish house setup** (if incomplete), **Create this week's meals** / **Waiting for your Bot…** (if setup done), or the dual-approve ballot when it lands.
+Bot checks are adaptive: about every hour while you’re setting up or waiting, and every 6 hours when the week is settled. **House → Bot check frequency** can set every hour, every 3 hours, or every 6 hours instead. **Check now** means message your Bot — the app does not push. See [`docs/bot-routines.md`](docs/bot-routines.md).
+
+Empty This week: **Finish house setup** (if incomplete), **Create this week's meals** / **Waiting for your Bot…** (if setup done), or the dual-approve ballot when it lands. While you’re waiting, the page says how often the Bot checks. When the week is settled, that line stays off.
 
 ### 9. Add the other adult
 
@@ -254,7 +257,9 @@ After Create household, walk through house setup (no Seed/sample week):
 5) Stores — enter zip/postal, multi-select regional grocers, or type in a store. No default stores. Labels only — never invent grocery prices; cart adds only where the store actually supports them.
 6) Optional weekly meal budget (or skip).
 7) Tap Create this week's meals — app writes a ballot request and shows Waiting for your Bot… until the ballot appears. Copy paste for your Grok Bot is DIY fallback only (collapsed).
-Empty This week: Finish house setup (if incomplete), Create this week's meals / Waiting for your Bot… (if setup done), or the dual-approve ballot when it lands.
+Empty This week: Finish house setup (if incomplete), Create this week's meals / Waiting for your Bot… (if setup done), or the dual-approve ballot when it lands. While waiting, the page says how often the Bot checks. When the week is settled, that line stays off.
+
+Bot checks are adaptive. Start @every 1h while setup is incomplete or work is pending, otherwise @every 6h. On each run, GET /api/bot/status with a household member access token (Authorization: Bearer). Read cadence.mode, cadence.interval_hours, and cadence.phase, then update your own routine to match. Do the work when needs_work is true. Stay silent when nothing changed — no “no update” message. If the owner changes House → Bot check frequency, follow that fixed interval (@every 1h, @every 3h, or @every 6h). Check now in the app is a hint to message the Bot, not a push from the app.
 
 Rules: easy for anyone; never invent grocery prices; cart adds only where the store actually supports them (don’t claim Smith’s or any store cart add unless it’s real). Do NOT invent prices. Do NOT claim unsupported cart features. Don’t stop at “try it without Supabase.” Worker name stays bot-my-meals.
 ```
@@ -311,7 +316,7 @@ Optional on GitHub: **Settings → Branches** → protect `main` and require the
 
 ## Schema
 
-`Household` (including `setup_step` 1–7 wizard / 8 done, `household_size`, `nights_planned`, `postal_code`, and optional `weekly_budget_cents`), `Membership` (owner / voter / eater), `User` (`auth.users` + `profiles`), `Week`, `Meal`, `Vote`, `Recipe`, `ShoppingList`, `ShoppingItem` (store tag, quantity, optional `price_cents` + `price_source` + `priced_at`). Pending people live in `household_invites` until they sign in. Textable partner links live in `household_join_tokens` (`/join/<token>`). Meal Ops inbox is `ballot_requests` (pending → fulfilled when meals are inserted).
+`Household` (including `setup_step` 1–7 wizard / 8 done, `household_size`, `nights_planned`, `postal_code`, optional `weekly_budget_cents`, `bot_check_mode` default `adaptive`, and `bot_check_interval_hours` null unless fixed at 1, 3, or 6), `Membership` (owner / voter / eater), `User` (`auth.users` + `profiles`), `Week`, `Meal`, `Vote`, `Recipe`, `ShoppingList`, `ShoppingItem` (store tag, quantity, optional `price_cents` + `price_source` + `priced_at`). Pending people live in `household_invites` until they sign in. Textable partner links live in `household_join_tokens` (`/join/<token>`). Meal Ops inbox is `ballot_requests` (pending → fulfilled when meals are inserted). Quiet bot wakes use `GET /api/bot/status`.
 
 Eaters can belong to the household later without voting. Only owner and voter roles count toward lock. Households are rows in this schema, not separate Workers.
 

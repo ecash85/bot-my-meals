@@ -123,7 +123,8 @@ describe("setup surfaces", () => {
     expect(readme).toMatch(/walk through house setup \(no Seed\/sample week\)/);
     expect(readme).toMatch(/Setup · step N of 7/);
     expect(readme).toMatch(/20260917160000_wizard_v2_ballot_request\.sql/);
-    expect(readme).toMatch(/all eight/);
+    expect(readme).toMatch(/all nine/);
+    expect(readme).toMatch(/20260927040000_bot_check_cadence\.sql/);
     expect(readme).toMatch(/request_week_ballot/);
     expect(readme).toMatch(/ballot_requests/);
     expect(readme).toMatch(/Copy paste for your Grok Bot/);

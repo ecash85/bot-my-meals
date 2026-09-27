@@ -265,6 +265,8 @@ export function emptyHousehold(name: string, owner?: UserProfile): HouseholdSnap
     householdSize: DEFAULT_FAMILY_SIZE,
     nightsPlanned: 7,
     postalCode: null,
+    botCheckMode: "adaptive",
+    botCheckIntervalHours: null,
   };
 
   const memberships: Membership[] = owner

@@ -6,6 +6,8 @@ DIY households deploy this Worker on **their** Cloudflare account and open **the
 
 GitHub Actions is CI-only (`npm ci`, `npm test`, `npm run lint`, `npm run build:worker`). Production deploy is Cloudflare Workers Builds.
 
+Household Grok Bot checks default to adaptive (`@every 1h` while setup or waiting, `@every 6h` when the week is settled). See `docs/bot-routines.md`.
+
 Next.js agent notes: keep the block below when `next dev` rewrites it.
 
 

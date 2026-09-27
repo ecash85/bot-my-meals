@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AppearancePicker } from "@/components/appearance-picker";
+import { BotCheckFrequency } from "@/components/bot-check-frequency";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { HouseCard } from "@/components/house-card";
@@ -179,6 +180,13 @@ function SettingsBody() {
           </p>
         )}
       </HouseCard>
+
+      <BotCheckFrequency
+        mode={snapshot.household.botCheckMode}
+        intervalHours={snapshot.household.botCheckIntervalHours}
+        canEdit={owner}
+        onChange={(patch) => updateHousehold(patch)}
+      />
 
       {owner && snapshot.week.status === "locked" ? (
         <section className="mt-6 space-y-2">

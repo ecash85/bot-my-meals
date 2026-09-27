@@ -17,6 +17,12 @@ export type NightLifecycle = (typeof NIGHT_LIFECYCLES)[number];
 export type Audience = "couple" | "family";
 export type WeekStatus = "voting" | "locked";
 
+export const BOT_CHECK_MODES = ["adaptive", "fixed"] as const;
+export type BotCheckMode = (typeof BOT_CHECK_MODES)[number];
+
+export const BOT_CHECK_INTERVAL_HOURS = [1, 3, 6] as const;
+export type BotCheckIntervalHours = (typeof BOT_CHECK_INTERVAL_HOURS)[number];
+
 export type UserProfile = {
   id: string;
   email: string;
@@ -58,6 +64,10 @@ export type Household = {
   householdSize: number;
   nightsPlanned: number;
   postalCode: string | null;
+  /** `adaptive` is the default. `fixed` uses `botCheckIntervalHours`. */
+  botCheckMode: BotCheckMode;
+  /** 1, 3, or 6 when fixed. Null when adaptive. */
+  botCheckIntervalHours: BotCheckIntervalHours | null;
 };
 
 export type BallotRequest = {
@@ -189,6 +199,8 @@ export type HouseholdSettingsPatch = {
   householdSize?: number;
   nightsPlanned?: number;
   postalCode?: string | null;
+  botCheckMode?: BotCheckMode;
+  botCheckIntervalHours?: BotCheckIntervalHours | null;
 };
 
 export type PendingInvite = {
