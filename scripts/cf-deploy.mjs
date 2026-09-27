@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Production Builds watch this file; keep deploy logic here.
 /**
  * Deploy guard for Cloudflare Workers Builds / local wrangler.
  *
