@@ -295,6 +295,13 @@ describe("Clear Sky list craft", () => {
     expect(row).toContain('data-slot="list-row"');
     expect(row).toContain("font-mono");
     expect(row).toContain("min-h-12");
+    expect(row).not.toContain("Loader2");
+    expect(row).not.toContain("animate-spin");
+    expect(row).not.toContain("aria-busy");
+    expect(row).not.toContain("syncing");
+    expect(list).toContain("useOptimisticValue");
+    expect(list).not.toContain("syncing");
+    expect(list).not.toContain(".pending");
     expect(list).toContain("LIST_PRE_LOCK_DESCRIPTION");
     expect(list).toContain("removedMealIds");
     expect(list).not.toContain("skippedMealIds");
