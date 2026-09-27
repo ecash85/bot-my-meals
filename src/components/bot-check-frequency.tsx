@@ -74,7 +74,7 @@ export function BotCheckFrequency({
   };
 
   return (
-    <HouseCard className="mt-6" data-slot="bot-check-frequency">
+    <HouseCard id="bot-check" className="mt-6 scroll-mt-24" data-slot="bot-check-frequency">
       <h2 className="type-section text-primary">{BOT_CHECK_SECTION_LABEL}</h2>
       <p className="type-meta mt-1 text-muted-foreground">{BOT_CHECK_HELPER}</p>
       <div role="radiogroup" aria-label={BOT_CHECK_SECTION_LABEL} className="mt-3 space-y-2">

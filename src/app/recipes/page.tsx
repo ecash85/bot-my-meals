@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { LockFirstEmpty } from "@/components/lock-first-empty";
+import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
@@ -15,6 +16,7 @@ import {
   RECIPES_NO_HOUSEHOLD,
   RECIPES_PRE_LOCK_DESCRIPTION,
 } from "@/lib/lock-success";
+import { RECIPE_PENDING_BACK, isPendingBotFill } from "@/lib/post-lock-waiting";
 import { firstCookableMeal, recipeNightsForWeek } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +39,14 @@ function RecipesBody() {
   }
 
   const locked = snapshot.week.status === "locked";
+  const pendingFill = isPendingBotFill({
+    weekStatus: snapshot.week.status,
+    meals: snapshot.meals,
+    votes: snapshot.votes,
+    memberships: snapshot.memberships,
+    recipes: snapshot.recipes,
+    shoppingList: snapshot.shoppingList,
+  });
   const nights = recipeNightsForWeek(snapshot.meals);
   const removedMealIds = new Set(
     nights.filter((meal) => isNightOff(meal.id, snapshot.votes)).map((meal) => meal.id),
@@ -55,6 +65,22 @@ function RecipesBody() {
           description={RECIPES_PRE_LOCK_DESCRIPTION}
           meals={nights}
           removedMealIds={removedMealIds}
+        />
+      </AppShell>
+    );
+  }
+
+  if (pendingFill) {
+    return (
+      <AppShell
+        title="Recipes"
+        eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
+        backHref="/week"
+        backLabel={RECIPE_PENDING_BACK}
+      >
+        <PostLockWaitingCard
+          mode={snapshot.household.botCheckMode}
+          intervalHours={snapshot.household.botCheckIntervalHours}
         />
       </AppShell>
     );

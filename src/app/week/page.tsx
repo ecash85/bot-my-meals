@@ -11,6 +11,7 @@ import { BallotToast } from "@/components/ballot-toast";
 import { EmptyDayCard } from "@/components/empty-day-card";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
+import { LockedNightFrame, PostLockWaitingSheet } from "@/components/post-lock-waiting";
 import { WeekStrip } from "@/components/week-strip";
 import { Onboarding } from "@/components/onboarding";
 import { SetupWizard } from "@/components/setup-wizard";
@@ -31,6 +32,7 @@ import { formatMealCardDayLabel, formatWeekRange, toISODate, weekdayLabelFromNig
 import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
 import { focusNightCard, nightCardAnchorId } from "@/lib/week-strip";
 import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
+import { isPendingBotFill, lockedDinnerTap } from "@/lib/post-lock-waiting";
 import { recipeNightsForWeek } from "@/lib/recipes";
 import type { Meal, NightLifecycle, VoteChoice } from "@/lib/types";
 
@@ -59,6 +61,7 @@ function WeekBody() {
 function WeekBallot() {
   const { session, snapshot, setVote, requestWeekBallot } = useSupper();
   const [toast, setToast] = useState<string | undefined>();
+  const [waitingOpen, setWaitingOpen] = useState(false);
   const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
   const dismissToast = useCallback(() => setToast(undefined), []);
   const jumpToNight = useCallback((mealId: string) => {
@@ -68,6 +71,14 @@ function WeekBallot() {
   if (!snapshot) return null;
 
   const locked = snapshot.week.status === "locked";
+  const pendingFill = isPendingBotFill({
+    weekStatus: snapshot.week.status,
+    meals: snapshot.meals,
+    votes: snapshot.votes,
+    memberships: snapshot.memberships,
+    recipes: snapshot.recipes,
+    shoppingList: snapshot.shoppingList,
+  });
   const botCheck = botCheckForSnapshot(snapshot);
   const check = checkWeekLock(snapshot.meals, snapshot.votes, snapshot.memberships);
   const canVote = Boolean(session?.membershipId) && canActOnBallot(session?.role) && !locked;
@@ -123,8 +134,10 @@ function WeekBallot() {
                   latestNote: latest?.note,
                   canVote,
                   locked,
+                  pending: pendingFill,
                   lifecycle,
                   onAct: act,
+                  onWaiting: () => setWaitingOpen(true),
                 })}
               </div>
             );
@@ -143,6 +156,12 @@ function WeekBallot() {
         </p>
       ) : null}
       <BallotToast message={toast} onDismiss={dismissToast} />
+      <PostLockWaitingSheet
+        open={waitingOpen}
+        onOpenChange={setWaitingOpen}
+        mode={snapshot.household.botCheckMode}
+        intervalHours={snapshot.household.botCheckIntervalHours}
+      />
     </AppShell>
   );
 }
@@ -155,8 +174,10 @@ function renderNightCard({
   latestNote,
   canVote,
   locked,
+  pending,
   lifecycle,
   onAct,
+  onWaiting,
 }: {
   presentation: WeekNightPresentation;
   dayLabel: string;
@@ -165,8 +186,10 @@ function renderNightCard({
   latestNote?: string;
   canVote: boolean;
   locked: boolean;
+  pending: boolean;
   lifecycle: NightLifecycle;
   onAct: (mealId: string, choice: VoteChoice, note?: string) => void;
+  onWaiting: () => void;
 }): ReactNode {
   switch (presentation) {
     case "empty":
@@ -192,22 +215,29 @@ function renderNightCard({
       return <EmptyDayCard dayLabel={dayLabel} dayName={dayName} state="locked" />;
     case "ballot":
       return (
-        <BallotCard
-          dayLabel={dayLabel}
-          confirmDayLabel={dayName}
+        <LockedNightFrame
+          tap={lockedDinnerTap({ locked, pending, presentation })}
+          href={`/week/${meal.id}`}
           title={meal.title}
-          pitch={meal.pitch}
-          servings={meal.servings}
-          swapped={lifecycle === "swapped"}
-          swapNote={latestNote}
-          muted={isMutedBallotNight({
-            isLeftovers: meal.isLeftovers,
-            isNightOff: false,
-          })}
-          locked={locked}
-          onSwap={canVote ? (reason) => onAct(meal.id, "swap", reason) : undefined}
-          onRemove={canVote ? () => onAct(meal.id, "remove") : undefined}
-        />
+          onWaiting={onWaiting}
+        >
+          <BallotCard
+            dayLabel={dayLabel}
+            confirmDayLabel={dayName}
+            title={meal.title}
+            pitch={meal.pitch}
+            servings={meal.servings}
+            swapped={lifecycle === "swapped"}
+            swapNote={latestNote}
+            muted={isMutedBallotNight({
+              isLeftovers: meal.isLeftovers,
+              isNightOff: false,
+            })}
+            locked={locked}
+            onSwap={canVote ? (reason) => onAct(meal.id, "swap", reason) : undefined}
+            onRemove={canVote ? () => onAct(meal.id, "remove") : undefined}
+          />
+        </LockedNightFrame>
       );
     default: {
       const _exhaustive: never = presentation;

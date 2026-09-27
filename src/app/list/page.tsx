@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { ListRow } from "@/components/list-row";
 import { LockFirstEmpty } from "@/components/lock-first-empty";
+import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { formatWeekEyebrow } from "@/lib/dates";
@@ -15,6 +16,7 @@ import {
   LIST_PRE_LOCK_DESCRIPTION,
   LOCK_FIRST_TITLE,
 } from "@/lib/lock-success";
+import { isPendingBotFill } from "@/lib/post-lock-waiting";
 import { recipeNightsForWeek } from "@/lib/recipes";
 import { groupStickyStoreLists, listItemDisplay } from "@/lib/shopping";
 
@@ -37,6 +39,14 @@ function ListBody() {
   }
 
   const locked = snapshot.week.status === "locked";
+  const pendingFill = isPendingBotFill({
+    weekStatus: snapshot.week.status,
+    meals: snapshot.meals,
+    votes: snapshot.votes,
+    memberships: snapshot.memberships,
+    recipes: snapshot.recipes,
+    shoppingList: snapshot.shoppingList,
+  });
   const nights = recipeNightsForWeek(snapshot.meals);
   const removedMealIds = new Set(
     nights.filter((meal) => isNightOff(meal.id, snapshot.votes)).map((meal) => meal.id),
@@ -56,6 +66,17 @@ function ListBody() {
   }
 
   const list = snapshot.shoppingList;
+  if (pendingFill && (!list || list.items.length === 0)) {
+    return (
+      <AppShell title="Shopping list" eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}>
+        <PostLockWaitingCard
+          mode={snapshot.household.botCheckMode}
+          intervalHours={snapshot.household.botCheckIntervalHours}
+        />
+      </AppShell>
+    );
+  }
+
   if (!list || list.items.length === 0) {
     return (
       <AppShell title="Shopping list" eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}>

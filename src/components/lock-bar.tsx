@@ -2,6 +2,7 @@
 
 import { Lock } from "lucide-react";
 import Link from "next/link";
+import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { useSupper } from "@/components/supper-provider";
 import { Button } from "@/components/ui/button";
 import { weekdayLabelFromNight } from "@/lib/dates";
@@ -12,6 +13,7 @@ import {
   lockSuccessRecipesCta,
   lockSuccessRecipesKicker,
 } from "@/lib/lock-success";
+import { isPendingBotFill } from "@/lib/post-lock-waiting";
 import { firstCookableMeal } from "@/lib/recipes";
 
 export function LockBar() {
@@ -22,6 +24,26 @@ export function LockBar() {
   const check = checkWeekLock(snapshot.meals, snapshot.votes, snapshot.memberships);
 
   if (locked) {
+    const pending = isPendingBotFill({
+      weekStatus: snapshot.week.status,
+      meals: snapshot.meals,
+      votes: snapshot.votes,
+      memberships: snapshot.memberships,
+      recipes: snapshot.recipes,
+      shoppingList: snapshot.shoppingList,
+    });
+    if (pending) {
+      return (
+        <div data-slot="lock-bar" data-state="pending" className="space-y-3">
+          <PostLockWaitingCard
+            mode={snapshot.household.botCheckMode}
+            intervalHours={snapshot.household.botCheckIntervalHours}
+          />
+          {error ? <p className="type-meta text-destructive">{error}</p> : null}
+        </div>
+      );
+    }
+
     const firstMeal = firstCookableMeal(snapshot.meals, snapshot.votes);
     const weekday = firstMeal ? weekdayLabelFromNight(firstMeal.nightDate) : undefined;
     const recipesCta = lockSuccessRecipesCta(firstMeal?.title);

@@ -3,6 +3,7 @@
 import { use, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
+import { RecipePendingNotice } from "@/components/post-lock-waiting";
 import { RecipeBlock } from "@/components/recipe-view";
 import { useSupper } from "@/components/supper-provider";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { formatNightDate, weekdayLabelFromNight } from "@/lib/dates";
 import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
+import { RECIPE_PENDING_BACK, nightShowsRecipePending } from "@/lib/post-lock-waiting";
 import type { VoteChoice } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +55,15 @@ function MealDetail({ mealId }: { mealId: string }) {
   const weekday = weekdayLabelFromNight(meal.nightDate);
   const skipped = isNightOff(meal.id, snapshot.votes, snapshot.memberships);
   const recipe = snapshot.recipes.find((item) => item.mealId === meal.id);
+  const pendingRecipe = nightShowsRecipePending({
+    weekStatus: snapshot.week.status,
+    meals: snapshot.meals,
+    votes: snapshot.votes,
+    memberships: snapshot.memberships,
+    recipes: snapshot.recipes,
+    shoppingList: snapshot.shoppingList,
+    mealId: meal.id,
+  });
   const voters = votingMembers(snapshot.memberships);
   const canAct = canActOnBallot(session?.role) && !locked;
 
@@ -65,12 +76,15 @@ function MealDetail({ mealId }: { mealId: string }) {
       title={skipped && locked ? EMPTY_DAY_TITLE : meal.title}
       eyebrow={`${weekday} · ${formatNightDate(meal.nightDate)}`}
       backHref="/week"
+      backLabel={pendingRecipe ? RECIPE_PENDING_BACK : undefined}
     >
       {locked ? (
         skipped ? (
           <p className="type-body rounded-[14px] bg-secondary p-4 shadow-card">
             This night is off. It did not go on the shopping list.
           </p>
+        ) : pendingRecipe ? (
+          <RecipePendingNotice />
         ) : (
           <RecipeBlock recipe={recipe} servings={meal.servings} />
         )
