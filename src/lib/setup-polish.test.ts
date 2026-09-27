@@ -10,7 +10,7 @@ import {
   CHECK_EMAIL_TITLE,
   checkEmailBody,
 } from "./login";
-import { CREATE_HOUSE_DEFAULT_NAME, CREATE_HOUSE_TITLE } from "./setup";
+import { CREATE_HOUSE_BODY, CREATE_HOUSE_DEFAULT_NAME, CREATE_HOUSE_TITLE } from "./setup";
 
 const srcRoot = path.resolve(import.meta.dirname, "..");
 
@@ -45,6 +45,8 @@ describe("setup polish copy lock", () => {
     expect(JOIN_HOUSE_SAMPLE).toBe("Our house");
     expect(joinInviteBody("Our house")).toMatch(/This link opens Our house/);
     expect(CREATE_HOUSE_TITLE).toBe("Create household");
+    expect(CREATE_HOUSE_BODY).toBe("We’ll plan plates for everyone at the table.");
+    expect(CREATE_HOUSE_BODY).not.toMatch(/Alex|Jordan/);
     expect(CREATE_HOUSE_DEFAULT_NAME).toBe("Our house");
 
     const onboarding = readFileSync(path.join(srcRoot, "components/onboarding.tsx"), "utf8");
@@ -65,14 +67,19 @@ describe("setup polish copy lock", () => {
     expect(house).not.toContain("inviteCode={");
     expect(onboarding).not.toMatch(/\bTim\b/);
     expect(onboarding).not.toMatch(/\bRose\b/);
+    expect(onboarding).not.toMatch(/\bAlex\b/);
+    expect(onboarding).not.toMatch(/\bJordan\b/);
     expect(landing).not.toMatch(/\bTim\b/);
     expect(landing).not.toMatch(/\bRose\b/);
+    expect(wizard).not.toMatch(/\bAlex\b/);
+    expect(wizard).not.toMatch(/\bJordan\b/);
   });
 
   it("keeps the people stepper and replaces nights-count chips with Sun–Sat toggles", () => {
     const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");
     const toggles = readFileSync(path.join(srcRoot, "components/night-toggles.tsx"), "utf8");
     expect(wizard).toContain("household-size");
+    expect(wizard).not.toContain("HOUSE_SIZE_LATER_HELPER");
     expect(wizard).toContain("NightToggles");
     expect(wizard).toContain("hideNav");
     expect(wizard).toContain("compactOffNights");

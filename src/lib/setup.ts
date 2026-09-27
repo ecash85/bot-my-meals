@@ -5,8 +5,7 @@ export const SETUP_HELPER =
   "Seven short steps. Invite people first — then how many people, which nights, stores, budget, and create meals.";
 
 export const CREATE_HOUSE_TITLE = "Create household";
-export const CREATE_HOUSE_BODY =
-  "We’ll plan plates for everyone at the table — Alex, Jordan, and anyone else at home.";
+export const CREATE_HOUSE_BODY = "We’ll plan plates for everyone at the table.";
 export const CREATE_HOUSE_HELPER = "One household. Partners join from a link you share — no invite code to type.";
 export const CREATE_HOUSE_DEFAULT_NAME = "Our house";
 

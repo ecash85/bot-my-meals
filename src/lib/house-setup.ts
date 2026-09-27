@@ -35,7 +35,7 @@ export const HOUSE_SETUP_STEPS = [
     id: "size" as const,
     step: 2,
     title: "How many people?",
-    helper: "We’ll plan plates for everyone at the table — Alex, Jordan, and anyone else at home.",
+    helper: "Plates for everyone at the table. You can change this later.",
     cta: "Next",
   },
   {
@@ -78,7 +78,6 @@ export const HOUSE_SETUP_STEPS = [
 ] as const;
 
 export const ALL_NIGHTS_ON = [true, true, true, true, true, true, true] as const;
-export const HOUSE_SIZE_LATER_HELPER = "You can change this later.";
 
 export function nightsPlannedLabel(nights: number): string {
   return `${clampNightsPlanned(nights)} of 7`;

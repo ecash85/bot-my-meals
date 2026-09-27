@@ -18,7 +18,6 @@ import {
   ALL_NIGHTS_ON,
   CREATE_MEALS_CTA,
   DIY_GROK_PASTE_CTA,
-  HOUSE_SIZE_LATER_HELPER,
   applyNightOnsToHeadcounts,
   clampHouseholdSize,
   formatWeeklyBudgetDollars,
@@ -367,7 +366,6 @@ export function SetupWizard() {
               canEdit={owner}
               onChange={setSizeDraft}
             />
-            <p className="type-meta mt-3 text-muted-foreground">{HOUSE_SIZE_LATER_HELPER}</p>
           </div>
         </HouseCard>
       );
