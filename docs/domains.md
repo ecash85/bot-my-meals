@@ -21,12 +21,11 @@ On **your** Supabase project:
 - **Redirect URLs**:
   - `https://<your-host>`
   - `https://<your-host>/auth/callback`
+  - `https://<your-host>/login/new-password`
 
 Do **not** set Site URL to someone else’s house. Do **not** add `{handle}.botmymeals.com` wildcards for DIY.
 
-Create account and Sign in finish in the app. They do **not** depend on opening a mail link. Also allow:
-
-- `https://<your-host>/login/new-password`
+Create account and Sign in finish in the app. They do **not** depend on opening a mail link. Keep `/auth/callback` and `/login/new-password` on the allowlist for a leftover link or password reset.
 
 ## Email and password on phones
 

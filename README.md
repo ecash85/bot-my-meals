@@ -42,7 +42,7 @@ Do these in order. Phones stay in sync only after a real Worker, a new Supabase 
 
 1. Deploy (or already know the **final HTTPS origin** phones will open) **before** setting Supabase Site URL.
 2. Finish Auth + the two public env vars **before** creating the Admin or adding a partner.
-3. **Add to Home Screen** can happen as soon as the HTTPS URL works (Safari **Share → Add to Home Screen**). Do not wait for household creation. Sign-in and adding people still need email codes + env.
+3. **Add to Home Screen** can happen as soon as the HTTPS URL works (Safari **Share → Add to Home Screen**). Do not wait for household creation. Sign-in and adding people still need email + password + env.
 
 Missing, blank, or invalid `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` is an **incomplete install**. The app **builds** without those values, but every route shows the first-run **setup gate** (“Set up the real house”) until they are set and the Worker is rebuilt / redeployed. There is no localStorage household fallback.
 
@@ -89,7 +89,7 @@ Save and let the first build finish.
 
 Do not use `www.botmymeals.com` as the app.
 
-**Know this HTTPS origin now.** Site URL and the Auth redirect must match the host people actually open (custom domain or workers.dev — no `www` unless configured). Set Auth to that origin before the first sign-in code. Auth allowlist details: [`docs/domains.md`](docs/domains.md).
+**Know this HTTPS origin now.** Site URL and the Auth redirect must match the host people actually open (custom domain or workers.dev — no `www` unless configured). Set Auth to that origin before anyone taps **Create account**. Auth allowlist details: [`docs/domains.md`](docs/domains.md).
 
 Once this URL loads, you may already **hand back the HTTPS URL + Safari Add to Home Screen**. You do not need a household first. Without the two public keys, the page shows the setup gate — finish Auth + env before creating the Admin.
 
@@ -254,7 +254,7 @@ Do this, one decision at a time if you need me to click:
 1) Help me create a Cloudflare account and deploy the Worker named bot-my-meals from https://github.com/timdoes/bot-my-meals via Workers Builds (Cloudflare dashboard → connect GitHub). Terminal npm run deploy only if I already develop.
 2) Create a new Supabase Free project.
 3) Run every file in supabase/migrations/ in filename order (SQL editor or supabase db push).
-4) Turn on Email sign-in. Turn Confirm email OFF so people create an account and stay in the app (important on iPhone Home Screen). Set Site URL to our HTTPS origin, and add /auth/callback and /login/new-password (our workers.dev or our own domain — not {handle}.botmymeals.com). People use email + password in the app — not a magic link. Optional later: custom SMTP + a code in the email template ({{ .Token }}) for sign-in codes. Do not turn on Apple or Google for Install. Passkeys later.
+4) Turn on Email sign-in. Turn Confirm email OFF so people create an account and stay in the app (important on iPhone Home Screen). Set Site URL to our HTTPS origin, and add /auth/callback and /login/new-password (our workers.dev or our own domain — not {handle}.botmymeals.com). People use email + password in the app — not a magic link. If a password minimum is shown, set it to at least 8. Optional later: custom SMTP + a code in the email template ({{ .Token }}) for sign-in codes. Do not turn on Apple or Google for Install. Passkeys later. Do not require custom SMTP to install.
 5) Set only these two public Worker env vars, then redeploy: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never use the service-role key.
 6) Give me the HTTPS link, walk me through Add to Home Screen, create the household Admin, finish the 7-step setup, then add my partner (share the /join/<token> link; House → People still works).
 
