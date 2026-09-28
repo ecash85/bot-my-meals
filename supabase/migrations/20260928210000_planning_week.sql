@@ -15,26 +15,27 @@ declare
   h public.households%rowtype;
   today date;
   cooking_start date;
-  found public.weeks%rowtype;
+  -- week_row must not be named found: that shadows PL/pgSQL's boolean FOUND.
+  week_row public.weeks%rowtype;
 begin
   select * into h from public.households where id = hid;
   if not found then
-    return found;
+    return week_row;
   end if;
 
   today := private.house_local_date(h.timezone);
   cooking_start := private.week_start(h.week_starts_on, today);
 
-  select * into found
+  select * into week_row
   from public.weeks
   where household_id = hid
     and starts_on = cooking_start;
 
-  if found.id is not null then
-    return found;
+  if week_row.id is not null then
+    return week_row;
   end if;
 
-  select * into found
+  select * into week_row
   from public.weeks
   where household_id = hid
     and starts_on <= cooking_start
@@ -42,18 +43,18 @@ begin
   order by starts_on desc
   limit 1;
 
-  if found.id is not null then
-    return found;
+  if week_row.id is not null then
+    return week_row;
   end if;
 
-  select * into found
+  select * into week_row
   from public.weeks
   where household_id = hid
     and not (status = 'locked' and private.week_saturday(starts_on) < today)
   order by starts_on asc
   limit 1;
 
-  return found;
+  return week_row;
 end;
 $$;
 
