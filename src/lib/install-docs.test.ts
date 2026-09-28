@@ -44,6 +44,7 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).toMatch(/sender key/);
   expect(paste).toMatch(/webhook trigger/);
   expect(paste).toMatch(/ballot \/ recipes \/ shopping list \/ setup/);
+  expect(paste).toMatch(/for the week that needs work/);
   expect(paste).toMatch(/stay quiet if nothing changed/);
   expect(paste).toMatch(/Never NEXT_PUBLIC/);
   expect(paste).toMatch(/do not show the full secret again/i);
@@ -51,6 +52,42 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).not.toMatch(/Copy POST to and key/);
   expect(paste).not.toMatch(/NEXT_PUBLIC_BOT_WAKE/);
   expect(paste).not.toMatch(/grandma/i);
+}
+
+function expectDualWeekInstallPaste(paste: string) {
+  expect(paste).toMatch(/Create this week's meals/);
+  expect(paste).toMatch(/do not create a planning week during setup/);
+  expect(paste).toMatch(/one cooking week \+ one planning week/);
+  expect(paste).toMatch(/Do not open a third week/);
+  expect(paste).toMatch(/Home always opens on the cooking week/);
+  expect(paste).toMatch(/This week \| Next week/);
+  expect(paste).toMatch(/week-scoped/);
+  expect(paste).toMatch(/Waiting, Lock, recipes, shopping, Check now, and Wake/);
+  expect(paste).toMatch(/Shopping · This week/);
+  expect(paste).toMatch(/Shopping · Next week/);
+  expect(paste).toMatch(/never merge cooking \+ planning/);
+  expect(paste).toMatch(/Request for next week/);
+  expect(paste).toMatch(/planning week/);
+  expect(paste).toMatch(/needs_work is true on any open week/);
+  expect(paste).toMatch(/Fulfill by week/);
+  expect(paste).toMatch(
+    /Do not treat a settled cooking week as idle if the planning week still needs work/,
+  );
+  expect(paste).toMatch(/for the week that needs work/);
+  expect(paste).not.toMatch(/7\) Tap Plan next week/);
+  expect(paste).not.toMatch(/grandma/i);
+}
+
+function expectDualWeekProductLoop(readme: string) {
+  expect(readme).toMatch(/Install does not create a planning week/);
+  expect(readme).toMatch(/one cooking week \+ one planning week/);
+  expect(readme).toMatch(/This week \| Next week/);
+  expect(readme).toMatch(/Shopping · This week/);
+  expect(readme).toMatch(/Shopping · Next week/);
+  expect(readme).toMatch(/never merge cooking \+ planning/);
+  expect(readme).toMatch(/Request for next week/);
+  expect(readme).toMatch(/needs_work/);
+  expect(readme).not.toMatch(/grandma/i);
 }
 
 describe("Install docs — email + password + Wake on app event", () => {
@@ -65,6 +102,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectPasswordInstallHappyPath(domains);
     expectPasswordInstallHappyPath(paste);
     expectWakeInstallPaste(paste);
+    expectDualWeekInstallPaste(paste);
+    expectDualWeekProductLoop(readme);
 
     expect(paste).toMatch(/Confirm email OFF/);
     expect(paste).toMatch(/email \+ password/);
@@ -111,6 +150,41 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/fallback/);
     expect(routines).not.toMatch(/Copy \*\*POST to\*\* \(the webhook URL\) and \*\*key\*\*/);
     expect(routines).not.toMatch(/grandma/i);
+    expect(routines).toMatch(/any open week/);
+    expect(routines).toMatch(/for the week that needs work/);
+    expect(routines).toMatch(/Shopping · This week/);
+    expect(routines).toMatch(/Shopping · Next week/);
+    expect(routines).toMatch(/do not merge this week with next week/);
+  });
+
+  it("locks dual-week Install paste after first-ballot setup without forcing a planning week on day 1", () => {
+    const readme = readRepo("README.md");
+    const routines = readRepo("docs/bot-routines.md");
+    const saved = readRepo("docs/saved-meals.md");
+    const paste = grokPromptPaste(readme);
+
+    expectPasswordInstallHappyPath(paste);
+    expectWakeInstallPaste(paste);
+    expectDualWeekInstallPaste(paste);
+    expectDualWeekProductLoop(readme);
+
+    const setupAt = paste.indexOf("After Create household, walk through house setup");
+    const firstBallotAt = paste.indexOf("Tap Create this week's meals");
+    const dualWeekAt = paste.indexOf("After the first ballot is live");
+    expect(setupAt).toBeGreaterThan(-1);
+    expect(firstBallotAt).toBeGreaterThan(setupAt);
+    expect(dualWeekAt).toBeGreaterThan(firstBallotAt);
+
+    expect(saved).toMatch(/Request for next week/);
+    expect(saved).toMatch(/planning week/);
+    expect(saved).toMatch(/Requested for next week/);
+    expect(saved).toMatch(/will not open a week after next/);
+    expect(saved).toMatch(/do not say this week/);
+    expect(saved).not.toMatch(/grandma/i);
+
+    expect(routines).toMatch(/Waiting titles name/);
+    expect(routines).toMatch(/Shopping · This week/);
+    expect(routines).toMatch(/fulfill `reason` for the week that needs work/);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {

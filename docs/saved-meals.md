@@ -4,7 +4,7 @@ Household-shared pool. One row per dinner the house wants again. It is not a pri
 
 Cool-down is **21 days (3 weeks)** after `last_locked_at` — the last time that dinner was on a **locked** week — before a random ballot may suggest it again. Saving does not start the clock. **Request for next week** sets `requested_for_week` and bypasses cool-down for that week.
 
-The app does not invent a second waiting screen. **Request for next week** always targets the planning week. If that row is missing, `request_saved_for_planning` creates it (one next week only) and queues a ballot for that `starts_on`. Cool-down is unchanged — Request still bypasses it. Explicit requests ride that week’s `ballot_requests` inbox (`saved_recipe_keys`). A request already aimed at the planning week shows **Requested** until it is consumed or the week advances.
+The app does not invent a second waiting screen. **Request for next week** always targets the planning week. If that row is missing, `request_saved_for_planning` creates it (one next week only) and queues a ballot for that `starts_on`. If a planning week already exists, Request attaches to that week. It will not open a week after next. Cool-down is unchanged — Request still bypasses it. Explicit requests ride that week’s `ballot_requests` inbox (`saved_recipe_keys`). A request already aimed at the planning week shows **Requested** until it is consumed or the week advances. Copy stays **Request for next week** / **Requested for next week.** — do not say this week.
 
 ## Table `public.saved_meals`
 
