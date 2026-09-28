@@ -6,8 +6,12 @@ import { fetchBotWakeConfigured, requestBotWake, type WakeClientResult } from "@
 
 export const BOT_WAKE_CONFIGURED_EVENT = "bot-wake-configured";
 
-export function useBotWakeConfigured(override?: boolean): boolean {
-  const [configured, setConfigured] = useState(false);
+/**
+ * Null until GET /api/bot/wake answers. Callers that show hour cadence must
+ * wait for false — unknown is not a license to advertise the poll.
+ */
+export function useBotWakeConfigured(override?: boolean): boolean | null {
+  const [configured, setConfigured] = useState<boolean | null>(override ?? null);
 
   useEffect(() => {
     if (override !== undefined) return;

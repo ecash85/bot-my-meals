@@ -35,7 +35,7 @@ export function BotCheckNow({
   hint?: string;
   wakeHint?: string;
 }) {
-  const configured = useBotWakeConfigured(wakeConfigured);
+  const configured = useBotWakeConfigured(wakeConfigured) === true;
   const { busy, message, dismiss, wake } = useWakeNow(onCheckNow);
   const hint = configured ? (wakeHint ?? BOT_CHECK_NOW_WAKE_HINT) : (hintOverride ?? BOT_CHECK_NOW_HINT);
 
@@ -69,6 +69,7 @@ export function WaitingBotCheck({
   className,
   checkNowHint,
   checkNowWakeHint,
+  wakeConfigured,
 }: {
   status: BotCheckStatus;
   pendingWorkOnly?: boolean;
@@ -76,9 +77,12 @@ export function WaitingBotCheck({
   className?: string;
   checkNowHint?: string;
   checkNowWakeHint?: string;
+  wakeConfigured?: boolean;
 }) {
-  const line = waitingCadenceLine(status, { pendingWorkOnly });
-  if (!line && !checkNowWhenIdle) return null;
+  const configured = useBotWakeConfigured(wakeConfigured);
+  const raw = waitingCadenceLine(status, { pendingWorkOnly });
+  const line = configured === false ? raw : null;
+  if (!raw && !checkNowWhenIdle) return null;
   return (
     <div data-slot="bot-check-waiting" className={className}>
       {line ? (
@@ -86,7 +90,7 @@ export function WaitingBotCheck({
           {line}
         </p>
       ) : null}
-      <BotCheckNow hint={checkNowHint} wakeHint={checkNowWakeHint} />
+      <BotCheckNow hint={checkNowHint} wakeHint={checkNowWakeHint} wakeConfigured={wakeConfigured} />
     </div>
   );
 }

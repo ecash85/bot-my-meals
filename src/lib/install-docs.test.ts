@@ -108,6 +108,42 @@ function expectDualWeekProductLoop(readme: string) {
   expect(readme).not.toMatch(/grandma/i);
 }
 
+function expectPlanningPeopleGateInstallPaste(doc: string) {
+  expect(doc).toMatch(/People per night(?:\*\*)? first/);
+  expect(doc).toMatch(/Special instructions/);
+  expect(doc).toMatch(/Off \/ Solo \/ Couple \/ Family/);
+  expect(doc).toMatch(/prefill from House defaults/);
+  expect(doc).toMatch(/plates above zero/);
+  expect(doc).toMatch(/Next week started\. Set people per night/);
+  expect(doc).toMatch(/template for new weeks/);
+  expect(doc).toMatch(/do(?:es)? not write/i);
+  expect(doc).toMatch(/lands on (?:\*\*)?Next week/);
+  expect(doc).toMatch(/future swipe or ›/);
+  expect(doc).not.toMatch(/the future edge soft-stops or offers Plan next week/);
+  expect(doc).not.toMatch(/grandma/i);
+}
+
+function expectWebhookWaitingInstallPaste(doc: string) {
+  expect(doc).toMatch(/configured/);
+  expect(doc).toMatch(/does not teach checks every hour/);
+  expect(doc).toMatch(/Adaptive cadence/);
+  expect(doc).toMatch(/countdown-to-next-poll/);
+  expect(doc).toMatch(/Your bot was notified/);
+  expect(doc).toMatch(/silent backend fallback/);
+  expect(doc).toMatch(/When Wake is unset/);
+  expect(doc).toMatch(/Wake on app event/);
+  expect(doc).not.toMatch(/While waiting, the page says how often the Bot checks/);
+  expect(doc).not.toMatch(/While you(?:'|’)re waiting, the page says how often the Bot checks/);
+  expect(doc).not.toMatch(
+    /Bot checks are adaptive\. Start @every 1h while setup is incomplete or work is pending on any open week, otherwise @every 6h\. On each run/,
+  );
+  for (const para of doc.split(/\n+/)) {
+    if (!/@every 1h/.test(para)) continue;
+    expect(para).toMatch(/silent backend fallback|configured|webhook|Wake/);
+  }
+  expect(doc).not.toMatch(/grandma/i);
+}
+
 describe("Install docs — email + password + Wake on app event", () => {
   it("locks Auth, domains, and the #grok-prompt paste on password sign-in and Cos webhook wake", () => {
     const readme = readRepo("README.md");
@@ -122,6 +158,10 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectWakeInstallPaste(paste);
     expectDualWeekInstallPaste(paste);
     expectDualWeekProductLoop(readme);
+    expectPlanningPeopleGateInstallPaste(paste);
+    expectPlanningPeopleGateInstallPaste(readme);
+    expectWebhookWaitingInstallPaste(paste);
+    expectWebhookWaitingInstallPaste(readme);
 
     expect(paste).toMatch(/Confirm email OFF/);
     expect(paste).toMatch(/email \+ password/);
@@ -191,6 +231,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectWakeInstallPaste(paste);
     expectDualWeekInstallPaste(paste);
     expectDualWeekProductLoop(readme);
+    expectPlanningPeopleGateInstallPaste(paste);
+    expectWebhookWaitingInstallPaste(paste);
 
     const setupAt = paste.indexOf("After Create household, walk through house setup");
     const firstBallotAt = paste.indexOf("Tap Create this week's meals");
@@ -207,6 +249,10 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(saved).toMatch(/Plan next week/);
     expect(saved).toMatch(/same create path/);
     expect(saved).toMatch(/will not invent a third open week/);
+    expect(saved).toMatch(/People per night(?:\*\*)? first/);
+    expect(saved).toMatch(/Special instructions/);
+    expect(saved).toMatch(/Next week started\. Set people per night/);
+    expect(saved).toMatch(/template for new weeks/);
     expect(saved).not.toMatch(/grandma/i);
 
     expect(routines).toMatch(/Waiting titles name/);
@@ -214,6 +260,38 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/fulfill `reason` for the week that needs work/);
     expect(routines).toMatch(/horizontal swipe/);
     expect(routines).toMatch(/not a chip row/);
+    expect(routines).toMatch(/People per night(?:\*\*)? first/);
+    expect(routines).toMatch(/Special instructions/);
+    expect(routines).toMatch(/does not teach checks every hour/);
+    expect(routines).toMatch(/Your bot was notified/);
+    expect(routines).toMatch(/silent backend fallback/);
+    expect(routines).toMatch(/Next week started\. Set people per night/);
+    expect(routines).not.toMatch(/While waiting, the page says how often the Bot checks/);
+    expect(routines).not.toMatch(/the future edge soft-stops or offers Plan next week/);
+  });
+
+  it("locks empty Next week People per night first and webhook-configured Waiting voice", () => {
+    const readme = readRepo("README.md");
+    const routines = readRepo("docs/bot-routines.md");
+    const saved = readRepo("docs/saved-meals.md");
+    const paste = grokPromptPaste(readme);
+
+    expectPlanningPeopleGateInstallPaste(paste);
+    expectPlanningPeopleGateInstallPaste(readme);
+    expectWebhookWaitingInstallPaste(paste);
+    expectWebhookWaitingInstallPaste(readme);
+    expectWakeInstallPaste(paste);
+    expectDualWeekInstallPaste(paste);
+    expectPasswordInstallHappyPath(paste);
+
+    expect(readme).toContain("20260928233000_planning_people_gate.sql");
+    expect(saved).toMatch(/People per night(?:\*\*)? first/);
+    expect(saved).toMatch(/Special instructions/);
+    expect(routines).toMatch(/does not teach checks every hour/);
+    expect(routines).toMatch(/silent backend fallback/);
+    expect(routines).toMatch(/People per night(?:\*\*)? first/);
+    expect(paste).not.toMatch(/the page says how often the Bot checks/);
+    expect(readme).not.toMatch(/the page says how often the Bot checks/);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {

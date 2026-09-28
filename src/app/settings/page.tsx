@@ -17,6 +17,7 @@ import { InviteShare } from "@/components/invite-share";
 import { ManagePeople } from "@/components/manage-people";
 import { PeoplePerNight } from "@/components/people-per-night";
 import { useSupper } from "@/components/supper-provider";
+import { useViewedWeek } from "@/components/use-viewed-week";
 import { WeeklyBudgetField } from "@/components/weekly-budget-field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,7 @@ function SettingsBody() {
   } = useSupper();
   const router = useRouter();
   const owner = isAdmin(session?.role);
+  const { scope } = useViewedWeek();
   const [budgetDraft, setBudgetDraft] = useState<string | null>(null);
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [budgetBusy, setBudgetBusy] = useState(false);
@@ -229,7 +231,7 @@ function SettingsBody() {
         onChange={(patch) => updateHousehold(patch)}
       />
 
-      {owner && snapshot.week.status === "locked" ? (
+      {owner && scope?.week.status === "locked" ? (
         <section className="mt-6">
           <UnlockWeekControl variant="block" />
         </section>

@@ -14,6 +14,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
 import { LockedNightFrame, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
 import { PastWeekDetail } from "@/components/past-weeks";
+import { PlanningPeopleGate } from "@/components/planning-people-gate";
 import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { WeekChrome } from "@/components/week-chrome";
 import { Onboarding } from "@/components/onboarding";
@@ -35,6 +36,12 @@ import { botCheckForHousehold } from "@/lib/bot-check";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import {
+  PLANNING_CREATE_ERROR,
+  PLANNING_SWIPE_TOAST,
+  planningPeopleGateOpen,
+} from "@/lib/planning-people";
+import {
+  futureSwipeCreatesPlanning,
   navigatorEyebrow,
   navigatorHref,
   navigatorTitle,
@@ -79,12 +86,13 @@ function WeekBody() {
 
 function WeekBallot() {
   const router = useRouter();
-  const { session, snapshot, setVote, requestWeekBallot, planNextWeek } = useSupper();
+  const { session, snapshot, setVote, requestWeekBallot, planNextWeek, savePlanningPeople } = useSupper();
   const { role, scope, past, hasPlanning, stops, index, setViewedWeek } = useViewedWeek();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | undefined>();
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const creatingPlanning = useRef(false);
   const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
   const dismissToast = useCallback(() => setToast(undefined), []);
   const jumpToNight = useCallback((mealId: string) => {
@@ -114,9 +122,44 @@ function WeekBallot() {
     if (previous && previous.length > 0) setViewedWeek({ kind: "cooking" });
   }, [searchKey, searchParams, snapshot, setViewedWeek]);
 
+  const startPlanning = useCallback(
+    (announce: boolean) => {
+      if (creatingPlanning.current) return;
+      creatingPlanning.current = true;
+      setPlanning(true);
+      void planNextWeek()
+        .then(() => {
+          if (announce) setToast(PLANNING_SWIPE_TOAST);
+          setViewedWeek({ kind: "planning" });
+          router.replace(navigatorHref({ kind: "planning" }), { scroll: false });
+        })
+        .catch(() => setToast(PLANNING_CREATE_ERROR))
+        .finally(() => {
+          creatingPlanning.current = false;
+          setPlanning(false);
+        });
+    },
+    [planNextWeek, router, setViewedWeek],
+  );
+
   const stepWeek = useCallback(
     (direction: -1 | 1) => {
       const result = stepNavigator(stops, index, direction);
+      const canPlan =
+        isAdmin(session?.role) && isHouseSetupComplete(snapshot?.household.setupStep ?? 0);
+      if (
+        futureSwipeCreatesPlanning({
+          direction,
+          moved: result.moved,
+          kind: stops[index]?.kind,
+          hasPlanning,
+          canPlan,
+        })
+      ) {
+        if (creatingPlanning.current) return true;
+        startPlanning(true);
+        return true;
+      }
       if (!result.moved) return false;
       const selection = selectionFromStop(result.stop);
       setViewedWeek(selection);
@@ -124,7 +167,7 @@ function WeekBallot() {
       router.replace(navigatorHref(selection), { scroll: false });
       return true;
     },
-    [stops, index, setViewedWeek, router],
+    [stops, index, setViewedWeek, router, hasPlanning, session?.role, snapshot?.household.setupStep, startPlanning],
   );
 
   if (!snapshot) return null;
@@ -191,6 +234,13 @@ function WeekBallot() {
     !hasPlanning &&
     isAdmin(session?.role) &&
     isHouseSetupComplete(snapshot.household.setupStep);
+  const showPeopleGate =
+    scope != null &&
+    planningPeopleGateOpen({
+      role,
+      peopleConfirmedAt: scope.week.peopleConfirmedAt,
+      mealCount: scope.meals.length,
+    });
 
   const act = async (mealId: string, choice: VoteChoice, note?: string) => {
     try {
@@ -231,24 +281,29 @@ function WeekBallot() {
             showPlan
               ? {
                   busy: planning,
-                  onPlan: () => {
-                    setPlanning(true);
-                    void planNextWeek()
-                      .then(() => router.replace(navigatorHref({ kind: "planning" }), { scroll: false }))
-                      .catch(() => undefined)
-                      .finally(() => setPlanning(false));
-                  },
+                  onPlan: () => startPlanning(false),
                 }
               : null
           }
         />
       }
       status={undefined}
-      footer={!viewingPast && !locked && check.ready ? <LockBar /> : undefined}
+      footer={!viewingPast && !locked && check.ready && !showPeopleGate ? <LockBar /> : undefined}
     >
       <InstallPrompt />
       {viewingPast && past ? (
         <PastWeekDetail week={past} />
+      ) : showPeopleGate && scope ? (
+        <PlanningPeopleGate
+          household={snapshot.household}
+          canEdit={Boolean(session?.membershipId) && canActOnBallot(session?.role)}
+          busy={planning}
+          onSave={(counts, instructions) => savePlanningPeople(counts, instructions).then(() => undefined)}
+          onBack={() => {
+            setViewedWeek({ kind: "cooking" });
+            router.replace(navigatorHref({ kind: "cooking" }), { scroll: false });
+          }}
+        />
       ) : nights.length === 0 ? (
         <EmptyWeek onCreateMeals={() => requestWeekBallot(scope?.week.startsOn)} />
       ) : (

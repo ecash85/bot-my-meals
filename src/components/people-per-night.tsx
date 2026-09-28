@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Minus, Plus } from "lucide-react";
 import { HouseCard } from "@/components/house-card";
 import { WEEKDAY_LABELS } from "@/lib/dates";
@@ -12,6 +13,7 @@ import {
   normalizeNightHeadcounts,
 } from "@/lib/headcount";
 import type { Household, HouseholdSettingsPatch } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export function PeoplePerNight({
   household,
@@ -20,6 +22,8 @@ export function PeoplePerNight({
   title = "People per night",
   helper = "How many plates that night. Zero is an off night — no dinner planned.",
   compactOffNights = false,
+  className,
+  children,
 }: {
   household: Household;
   canEdit: boolean;
@@ -27,6 +31,8 @@ export function PeoplePerNight({
   title?: string;
   helper?: string;
   compactOffNights?: boolean;
+  className?: string;
+  children?: ReactNode;
 }) {
   const counts = normalizeNightHeadcounts(household.nightHeadcounts, household);
   const nights = WEEKDAY_LABELS.map((label, weekday) => ({
@@ -65,12 +71,13 @@ export function PeoplePerNight({
   );
 
   return (
-    <HouseCard className="mt-6">
+    <HouseCard className={cn("mt-6", className)}>
       <h2 className="type-section text-primary">{title}</h2>
       <p className="type-meta mt-1 text-muted-foreground">{helper}</p>
       <ul data-slot="people-per-night" className="mt-4 space-y-2">
         {visibleNights.map((night) => renderStepper(night.label, night.weekday))}
       </ul>
+      {children}
     </HouseCard>
   );
 }

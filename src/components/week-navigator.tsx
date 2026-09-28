@@ -69,66 +69,76 @@ export function WeekNavigator({
   };
 
   return (
-    <div
-      data-slot="week-navigator"
-      className="relative h-[52px] overflow-hidden bg-secondary"
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        origin.current = { x: event.clientX, y: event.clientY };
-        clearBounce();
-        setAnimate(false);
-      }}
-      onPointerMove={(event) => {
-        const start = origin.current;
-        if (!start) return;
-        const dx = event.clientX - start.x;
-        const dy = event.clientY - start.y;
-        if (Math.abs(dy) > Math.abs(dx)) return;
-        if (Math.abs(dx) < 8) return;
-        setOffset(Math.max(-28, Math.min(28, dx)));
-      }}
-      onPointerUp={(event) => {
-        const start = origin.current;
-        origin.current = null;
-        if (!start) return;
-        const direction = commitWeekSwipe(event.clientX - start.x, event.clientY - start.y);
-        if (!direction) {
+    <div data-slot="week-navigator" className="relative h-[52px] overflow-x-clip bg-secondary">
+      <div
+        className="h-full overflow-hidden"
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          origin.current = { x: event.clientX, y: event.clientY };
+          clearBounce();
+          setAnimate(false);
+        }}
+        onPointerMove={(event) => {
+          const start = origin.current;
+          if (!start) return;
+          const dx = event.clientX - start.x;
+          const dy = event.clientY - start.y;
+          if (Math.abs(dy) > Math.abs(dx)) return;
+          if (Math.abs(dx) < 8) return;
+          setOffset(Math.max(-28, Math.min(28, dx)));
+        }}
+        onPointerUp={(event) => {
+          const start = origin.current;
+          origin.current = null;
+          if (!start) return;
+          const direction = commitWeekSwipe(event.clientX - start.x, event.clientY - start.y);
+          if (!direction) {
+            setAnimate(true);
+            setOffset(0);
+            return;
+          }
+          swallowClick.current = true;
+          finishStep(direction);
+        }}
+        onPointerCancel={() => {
+          origin.current = null;
           setAnimate(true);
           setOffset(0);
-          return;
-        }
-        swallowClick.current = true;
-        finishStep(direction);
-      }}
-      onPointerCancel={() => {
-        origin.current = null;
-        setAnimate(true);
-        setOffset(0);
-      }}
-    >
-      <div
-        className={cn(
-          "h-full touch-pan-y",
-          animate && "transition-transform duration-200 motion-reduce:transition-none",
-        )}
-        style={offset === 0 ? undefined : { transform: `translateX(${offset}px)` }}
+        }}
       >
-        <WeekStrip
-          startsOn={startsOn}
-          nights={nights}
-          selectedMealId={selectedMealId}
-          todayIso={todayIso}
-          locked={locked}
-          mutedDates={mutedDates}
-          onSelect={(mealId) => {
-            if (swallowClick.current) {
-              swallowClick.current = false;
-              return;
-            }
-            onSelect(mealId);
-          }}
-        />
+        <div
+          className={cn(
+            "h-full touch-pan-y",
+            animate && "transition-transform duration-200 motion-reduce:transition-none",
+          )}
+          style={offset === 0 ? undefined : { transform: `translateX(${offset}px)` }}
+        >
+          <WeekStrip
+            startsOn={startsOn}
+            nights={nights}
+            selectedMealId={selectedMealId}
+            todayIso={todayIso}
+            locked={locked}
+            mutedDates={mutedDates}
+            onSelect={(mealId) => {
+              if (swallowClick.current) {
+                swallowClick.current = false;
+                return;
+              }
+              onSelect(mealId);
+            }}
+          />
+        </div>
       </div>
+      <div
+        aria-hidden
+        data-slot="week-nav-fade"
+        className="pointer-events-none absolute inset-y-0 left-0 z-30 w-6 bg-gradient-to-r from-secondary to-transparent"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 z-30 w-6 bg-gradient-to-l from-secondary to-transparent"
+      />
       <EdgeButton
         side="previous"
         label={EARLIER_WEEK_LABEL}
@@ -155,8 +165,8 @@ function EdgeButton({
       data-slot={side === "previous" ? "week-nav-previous" : "week-nav-next"}
       aria-label={label}
       className={cn(
-        "absolute top-1 z-10 grid size-11 place-items-center text-foreground",
-        side === "previous" ? "left-0" : "right-0",
+        "absolute top-1 z-30 grid size-11 place-items-center text-foreground",
+        side === "previous" ? "left-0 -translate-x-3" : "right-0 translate-x-3",
       )}
       onPointerDown={(event) => event.stopPropagation()}
       onPointerUp={(event) => event.stopPropagation()}

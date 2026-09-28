@@ -5,11 +5,13 @@ import Link from "next/link";
 import { BallotToast } from "@/components/ballot-toast";
 import { useBotWakeConfigured, useWakeNow } from "@/components/use-bot-wake";
 import { Button } from "@/components/ui/button";
-import type { WakeClientResult } from "@/lib/bot-wake-client";
+import { requestBotWake, type WakeClientResult } from "@/lib/bot-wake-client";
 import { waitingWeekCue } from "@/lib/open-weeks";
 import {
   POST_LOCK_BOT_CHECK_SETTINGS,
+  POST_LOCK_BOT_NOTIFIED,
   POST_LOCK_GET_RECIPES_LABEL,
+  POST_LOCK_WAKE_SETTINGS,
   POST_LOCK_WAITING_BODY,
   POST_LOCK_WAITING_TITLE,
   RECIPE_PENDING_BODY,
@@ -63,11 +65,17 @@ export function PostLockWaitingDetails({
   startsOn?: string;
   className?: string;
 }) {
-  const now = useCadenceNow(lastCheckedAt);
-  const cadence = postLockWaitingCadenceLine({ mode, intervalHours, lastCheckedAt, now });
   const configured = useBotWakeConfigured(wakeConfigured);
-  const { busy, message, dismiss, wake } = useWakeNow(onGetRecipes);
-  const hint = getRecipesHint(weekRole, configured);
+  const now = useCadenceNow(configured === true ? null : lastCheckedAt);
+  const cadence = postLockWaitingCadenceLine({ mode, intervalHours, lastCheckedAt, now });
+  const [notified, setNotified] = useState(false);
+  const { busy, message, dismiss, wake } = useWakeNow(async () => {
+    const result = await Promise.resolve(onGetRecipes ? onGetRecipes() : requestBotWake("check_now"));
+    if (result === "posted" || result === "debounced") setNotified(true);
+    return result;
+  });
+  const wakeOn = configured === true;
+  const hint = getRecipesHint(weekRole, wakeOn);
   const cue = startsOn ? waitingWeekCue(weekRole, startsOn) : null;
 
   return (
@@ -85,11 +93,18 @@ export function PostLockWaitingDetails({
       {showBody ? (
         <p className={cn("type-body text-muted-foreground", showTitle && "mt-2")}>{POST_LOCK_WAITING_BODY}</p>
       ) : null}
-      <p data-slot="post-lock-cadence" className="type-meta mt-3 text-foreground">
-        {cadence}
-      </p>
-      <div data-slot="post-lock-get-recipes" data-wake={configured ? "on" : "off"}>
-        {configured ? (
+      {configured === false ? (
+        <p data-slot="post-lock-cadence" className="type-meta mt-3 text-foreground">
+          {cadence}
+        </p>
+      ) : null}
+      {wakeOn && notified ? (
+        <p data-slot="post-lock-notified" className="type-meta mt-3 text-foreground">
+          {POST_LOCK_BOT_NOTIFIED}
+        </p>
+      ) : null}
+      <div data-slot="post-lock-get-recipes" data-wake={wakeOn ? "on" : "off"}>
+        {wakeOn ? (
           <Button
             type="button"
             variant="secondary"
@@ -108,11 +123,11 @@ export function PostLockWaitingDetails({
       </div>
       <BallotToast message={message} onDismiss={dismiss} />
       <Link
-        href="/settings#bot-check"
+        href={wakeOn ? "/settings#wake-your-bot" : "/settings#bot-check"}
         data-slot="post-lock-bot-settings"
         className="type-meta mt-4 inline-flex min-h-12 items-center font-semibold text-primary"
       >
-        {POST_LOCK_BOT_CHECK_SETTINGS}
+        {wakeOn ? POST_LOCK_WAKE_SETTINGS : POST_LOCK_BOT_CHECK_SETTINGS}
       </Link>
     </div>
   );
@@ -204,14 +219,15 @@ export function RecipePendingNotice({
   weekRole?: WeekRole;
 }) {
   const configured = useBotWakeConfigured(wakeConfigured);
+  const wakeOn = configured === true;
   const { busy, message, dismiss, wake } = useWakeNow(onWake);
-  const hint = recipePendingHint(weekRole, configured);
+  const hint = recipePendingHint(weekRole, wakeOn);
 
   return (
-    <div data-slot="recipe-pending" data-wake={configured ? "on" : "off"} className="rounded-[14px] bg-card p-5 shadow-card">
+    <div data-slot="recipe-pending" data-wake={wakeOn ? "on" : "off"} className="rounded-[14px] bg-card p-5 shadow-card">
       <h2 className="type-section">{RECIPE_PENDING_TITLE}</h2>
       <p className="type-body mt-2 text-muted-foreground">{RECIPE_PENDING_BODY}</p>
-      {configured ? (
+      {wakeOn ? (
         <Button
           type="button"
           variant="secondary"

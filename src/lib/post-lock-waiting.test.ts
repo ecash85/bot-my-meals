@@ -244,7 +244,7 @@ describe("post-lock waiting copy", () => {
 
   it("renders the waiting card and the recipe pending notice", () => {
     const card = renderToStaticMarkup(
-      createElement(PostLockWaitingCard, { mode: "adaptive", intervalHours: null }),
+      createElement(PostLockWaitingCard, { mode: "adaptive", intervalHours: null, wakeConfigured: false }),
     );
     expect(card).toContain("Waiting for your Bot");
     expect(card).toContain("Recipes and your shopping list show up after your Bot My Meals bot runs.");
@@ -257,10 +257,30 @@ describe("post-lock waiting copy", () => {
     expect(card).not.toContain("No recipe was saved");
 
     const fixed = renderToStaticMarkup(
-      createElement(PostLockWaitingCard, { mode: "fixed", intervalHours: 1 }),
+      createElement(PostLockWaitingCard, { mode: "fixed", intervalHours: 1, wakeConfigured: false }),
     );
     expect(fixed).toContain("Checks every 1 hour.");
     expect(fixed).not.toContain("Next check in about");
+
+    const webhookOn = renderToStaticMarkup(
+      createElement(PostLockWaitingCard, {
+        mode: "adaptive",
+        intervalHours: null,
+        lastCheckedAt: "2026-09-27T12:00:00.000Z",
+        wakeConfigured: true,
+      }),
+    );
+    expect(webhookOn).toContain("Waiting for your Bot");
+    expect(webhookOn).toContain("Get recipes now");
+    expect(webhookOn).toContain("Wakes your bot to fill recipes and the shopping list.");
+    expect(webhookOn).toContain('href="/settings#wake-your-bot"');
+    expect(webhookOn).toContain("Wake your Bot");
+    expect(webhookOn).not.toContain("post-lock-cadence");
+    expect(webhookOn).not.toContain("Checks about every hour");
+    expect(webhookOn).not.toContain("Checks every");
+    expect(webhookOn).not.toContain("Next check in about");
+    expect(webhookOn).not.toContain("Adaptive");
+    expect(webhookOn).not.toContain('href="/settings#bot-check"');
 
     const notice = renderToStaticMarkup(createElement(RecipePendingNotice));
     expect(notice).toContain("Your bot hasn\u2019t saved this recipe yet.");

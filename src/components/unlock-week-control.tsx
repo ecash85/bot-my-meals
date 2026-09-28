@@ -43,6 +43,7 @@ export function UnlockWeekControl({ variant }: { variant: "inline" | "block" }) 
         <div className="flex flex-wrap items-center gap-1">
           <span
             data-slot="week-locked-chip"
+            data-week-id={scope.week.id}
             className="inline-flex h-8 items-center gap-1.5 rounded-full bg-muted px-2.5 type-chip font-semibold text-foreground"
           >
             <Lock className="size-3.5" aria-hidden />

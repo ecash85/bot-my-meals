@@ -229,7 +229,7 @@ describe("bot status needs_work reasons", () => {
     });
     expect(waitingCadenceLine(gap, { pendingWorkOnly: true })).toBe(BOT_CHECK_WAITING_ADAPTIVE);
     const waitingHtml = renderToStaticMarkup(
-      createElement(WaitingBotCheck, { status: gap, pendingWorkOnly: true }),
+      createElement(WaitingBotCheck, { status: gap, pendingWorkOnly: true, wakeConfigured: false }),
     );
     expect(waitingHtml).toContain("Checks about every hour while you\u2019re waiting.");
     expect(waitingHtml).toContain("Check now");
@@ -409,6 +409,7 @@ describe("Settings and Waiting copy lock", () => {
       createElement(WaitingBotCheck, {
         status: status({ ballotStatus: "pending" }),
         checkNowWhenIdle: true,
+        wakeConfigured: false,
       }),
     );
     expect(waitingHtml).toContain("Checks about every hour while you\u2019re waiting.");
@@ -418,6 +419,7 @@ describe("Settings and Waiting copy lock", () => {
       createElement(WaitingBotCheck, {
         status: status(),
         pendingWorkOnly: true,
+        wakeConfigured: false,
       }),
     );
     expect(settledHtml).toBe("");
@@ -425,10 +427,22 @@ describe("Settings and Waiting copy lock", () => {
     const fixedHtml = renderToStaticMarkup(
       createElement(WaitingBotCheck, {
         status: status({ mode: "fixed", intervalHours: 6, ballotStatus: "pending" }),
+        wakeConfigured: false,
       }),
     );
     expect(fixedHtml).toContain("Checks every 6 hours.");
     expect(fixedHtml).not.toContain("Checks about every hour");
+
+    const webhookOn = renderToStaticMarkup(
+      createElement(WaitingBotCheck, {
+        status: status({ ballotStatus: "pending" }),
+        wakeConfigured: true,
+      }),
+    );
+    expect(webhookOn).toContain("Check now");
+    expect(webhookOn).not.toContain("Checks about every hour");
+    expect(webhookOn).not.toContain("Checks every");
+    expect(webhookOn).not.toContain("Next check");
   });
 
   it("puts the radio list on House settings and the cadence on Waiting, without a fake push", () => {

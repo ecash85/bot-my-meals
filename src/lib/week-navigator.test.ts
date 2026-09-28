@@ -10,6 +10,7 @@ import {
   PAST_TITLES_ONLY,
   WEEK_SWIPE_THRESHOLD_PX,
   commitWeekSwipe,
+  futureSwipeCreatesPlanning,
   navigatorEyebrow,
   navigatorHref,
   navigatorStops,
@@ -108,6 +109,54 @@ describe("week navigator continuum", () => {
     expect(EARLIER_WEEK_LABEL).toBe("Earlier week");
     expect(LATER_WEEK_LABEL).toBe("Later week");
   });
+
+  it("creates next week from cooking’s future edge and refuses a week after next", () => {
+    expect(
+      futureSwipeCreatesPlanning({
+        direction: 1,
+        moved: false,
+        kind: "cooking",
+        hasPlanning: false,
+        canPlan: true,
+      }),
+    ).toBe(true);
+    expect(
+      futureSwipeCreatesPlanning({
+        direction: 1,
+        moved: false,
+        kind: "planning",
+        hasPlanning: true,
+        canPlan: true,
+      }),
+    ).toBe(false);
+    expect(
+      futureSwipeCreatesPlanning({
+        direction: 1,
+        moved: true,
+        kind: "cooking",
+        hasPlanning: true,
+        canPlan: true,
+      }),
+    ).toBe(false);
+    expect(
+      futureSwipeCreatesPlanning({
+        direction: -1,
+        moved: false,
+        kind: "cooking",
+        hasPlanning: false,
+        canPlan: true,
+      }),
+    ).toBe(false);
+    expect(
+      futureSwipeCreatesPlanning({
+        direction: 1,
+        moved: false,
+        kind: "cooking",
+        hasPlanning: false,
+        canPlan: false,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("week navigator chrome", () => {
@@ -128,6 +177,9 @@ describe("week navigator chrome", () => {
     expect(html).toContain('data-slot="week-nav-previous"');
     expect(html).toContain('data-slot="week-nav-next"');
     expect(html).toContain("size-11");
+    expect(html).toContain('data-slot="week-nav-fade"');
+    expect(html).toContain("pointer-events-none");
+    expect(html).toContain("z-20");
     expect(html).toContain("Earlier week");
     expect(html).toContain("Later week");
     expect(html.match(/data-slot="week-strip-cell"/g)).toHaveLength(7);

@@ -92,6 +92,8 @@ export type BallotRequest = {
   createdAt: string;
   updatedAt: string;
   fulfilledAt: string | null;
+  /** Optional note for the bot on this week. Null when the house left it blank. */
+  specialInstructions: string | null;
 };
 
 export type Ingredient = {
@@ -151,6 +153,12 @@ export type Week = {
   /** House-local date of a mid-week unlock. Nights before this stay read-only. */
   editableFrom: string | null;
   shoppingPrompt: ShoppingPrompt;
+  /** Null until this week's plates are saved. The planning gate stays open while null. */
+  peopleConfirmedAt: string | null;
+  /** This week's plates. Null until saved. House defaults stay on the household. */
+  nightHeadcounts: number[] | null;
+  /** Optional bot note for this week. */
+  specialInstructions: string | null;
 };
 
 /** Title-only dinner kept after a week finishes. No recipe payload. */

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createClient } from "@supabase/supabase-js";
 import { BallotToast } from "@/components/ballot-toast";
 import { botCheckForHousehold } from "@/lib/bot-check";
+import { patchPlanningPeople } from "@/lib/planning-people";
 import { shouldWakeNeedsWork } from "@/lib/bot-wake";
 import { requestBotWake } from "@/lib/bot-wake-client";
 import { storeSlugForAdd } from "@/lib/grocers";
@@ -54,6 +55,7 @@ import {
   supabaseRequestSavedMeal,
   supabaseRequestWeekBallot,
   supabaseSaveMeal,
+  supabaseSavePlanningPeople,
   supabaseSetMemberRole,
   supabaseSetVote,
   supabaseToggleItem,
@@ -130,6 +132,7 @@ type SupperContextValue = {
   createJoinToken: (rotate?: boolean) => Promise<string>;
   requestWeekBallot: (startsOn?: string) => Promise<string>;
   planNextWeek: () => Promise<string>;
+  savePlanningPeople: (counts: number[], instructions: string) => Promise<string>;
   toggleSavedMeal: (mealId: string) => Promise<"saved" | "removed">;
   removeSavedMeal: (recipeKey: string) => Promise<void>;
   requestSavedMeal: (recipeKey: string) => Promise<"requested" | "already">;
@@ -187,6 +190,7 @@ function createSetupContext(): SupperContextValue {
     createJoinToken: async () => setupUnavailable(),
     requestWeekBallot: async () => setupUnavailable(),
     planNextWeek: async () => setupUnavailable(),
+    savePlanningPeople: async () => setupUnavailable(),
     toggleSavedMeal: async () => setupUnavailable(),
     removeSavedMeal: async () => setupUnavailable(),
     requestSavedMeal: async () => setupUnavailable(),
@@ -742,6 +746,16 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           setViewedRole("planning");
           return id;
         }),
+      savePlanningPeople: (counts, instructions) =>
+        runOptimistic(
+          "planning-people",
+          (snap) => patchPlanningPeople(snap, { nightHeadcounts: counts, specialInstructions: instructions }),
+          async () => {
+            const client = createSupabaseBrowserClient();
+            if (!client) throw new Error("Not signed in");
+            return supabaseSavePlanningPeople(client, counts, instructions);
+          },
+        ),
       toggleSavedMeal: (mealId) => {
         const current = session;
         const visible = displayRef.current;

@@ -24,6 +24,9 @@ export const POST_LOCK_GET_RECIPES_LABEL = "Get recipes now";
 export const POST_LOCK_GET_RECIPES_HINT =
   "Message your Bot My Meals Grok Bot and ask it to fill recipes and the shopping list for this week. This isn\u2019t a push from the app.";
 export const POST_LOCK_BOT_CHECK_SETTINGS = "Bot check settings";
+export const POST_LOCK_WAKE_SETTINGS = "Wake your Bot";
+export const POST_LOCK_BOT_NOTIFIED =
+  "Your bot was notified. Recipes and your list will show up here.";
 
 export const RECIPE_PENDING_TITLE = "Waiting for your Bot";
 export const RECIPE_PENDING_BODY = "Your bot hasn\u2019t saved this recipe yet.";

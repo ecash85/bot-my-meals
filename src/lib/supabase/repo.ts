@@ -80,12 +80,24 @@ function mapBallotRequest(
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? ""),
     fulfilledAt: typeof row.fulfilled_at === "string" ? row.fulfilled_at : null,
+    specialInstructions: mapSpecialInstructions(row.special_instructions),
   };
 }
 
 function rowsOf<T>(data: T | T[] | null | undefined): T[] {
   if (data == null) return [];
   return Array.isArray(data) ? data : [data];
+}
+
+function mapSpecialInstructions(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function mapWeekPlates(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length !== 7) return null;
+  return normalizeNightHeadcounts(value as number[]);
 }
 
 function mapWeekRow(weekRow: Record<string, unknown>): Week {
@@ -97,6 +109,10 @@ function mapWeekRow(weekRow: Record<string, unknown>): Week {
     lockedAt: typeof weekRow.locked_at === "string" ? weekRow.locked_at : null,
     editableFrom: parseEditableFrom(weekRow.editable_from),
     shoppingPrompt: parseShoppingPrompt(weekRow.shopping_prompt),
+    peopleConfirmedAt:
+      typeof weekRow.people_confirmed_at === "string" ? weekRow.people_confirmed_at : null,
+    nightHeadcounts: mapWeekPlates(weekRow.night_headcounts),
+    specialInstructions: mapSpecialInstructions(weekRow.special_instructions),
   };
 }
 
@@ -759,6 +775,20 @@ export async function supabasePlanNextWeek(client: SupabaseClient) {
   const { data, error } = await client.rpc("plan_next_week");
   if (error) throw new Error(error.message);
   if (typeof data !== "string" || !data) throw new Error("Could not plan next week.");
+  return data;
+}
+
+export async function supabaseSavePlanningPeople(
+  client: SupabaseClient,
+  counts: number[],
+  instructions: string,
+) {
+  const { data, error } = await client.rpc("save_planning_people", {
+    counts,
+    instructions,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !data) throw new Error("Could not save people per night.");
   return data;
 }
 

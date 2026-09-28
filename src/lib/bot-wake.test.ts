@@ -416,6 +416,9 @@ describe("Wake your Bot settings and gated hints", () => {
     expect(waitingOn).toContain("Get recipes now");
     expect(waitingOn).toContain(POST_LOCK_GET_RECIPES_WAKE_HINT);
     expect(waitingOn).not.toContain("isn’t a push");
+    expect(waitingOn).not.toContain("Checks about every hour");
+    expect(waitingOn).not.toContain("Next check in about");
+    expect(waitingOn).not.toContain("post-lock-cadence");
 
     const recipeOff = renderToStaticMarkup(createElement(RecipePendingNotice, { wakeConfigured: false }));
     expect(recipeOff).toContain(RECIPE_PENDING_HINT);

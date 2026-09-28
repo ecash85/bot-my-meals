@@ -154,3 +154,23 @@ export function commitWeekSwipe(dx: number, dy: number): -1 | 1 | null {
   if (Math.abs(dx) < WEEK_SWIPE_THRESHOLD_PX) return null;
   return dx < 0 ? 1 : -1;
 }
+
+/**
+ * Future edge from cooking, with no planning row, creates next week.
+ * A further swipe from planning does not. Week-after-next is never created.
+ */
+export function futureSwipeCreatesPlanning(input: {
+  direction: -1 | 1;
+  moved: boolean;
+  kind: NavigatorStop["kind"] | undefined;
+  hasPlanning: boolean;
+  canPlan: boolean;
+}): boolean {
+  return (
+    input.direction === 1 &&
+    !input.moved &&
+    input.kind === "cooking" &&
+    !input.hasPlanning &&
+    input.canPlan
+  );
+}

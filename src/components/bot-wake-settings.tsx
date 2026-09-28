@@ -27,7 +27,7 @@ export function BotWakeSettings({
   canEdit: boolean;
   configured?: boolean;
 }) {
-  const fetched = useBotWakeConfigured(configuredOverride);
+  const fetched = useBotWakeConfigured(configuredOverride) === true;
   const [justSaved, setJustSaved] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [url, setUrl] = useState("");

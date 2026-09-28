@@ -5,7 +5,7 @@ import { weekStripCells, type WeekStripCell, type WeekStripNight } from "@/lib/w
 import { cn } from "@/lib/utils";
 
 const cellGeometry =
-  "relative flex h-[44px] min-h-[44px] min-w-[44px] flex-1 basis-0 shrink-0 flex-col items-center justify-start gap-0.5 rounded-[12px] px-0.5 pt-0.5 leading-none";
+  "relative z-20 flex h-[44px] min-h-[44px] min-w-[44px] flex-1 basis-0 shrink-0 flex-col items-center justify-start gap-0.5 rounded-[12px] px-0.5 pt-0.5 leading-none";
 
 export function WeekStrip({
   startsOn,
@@ -31,7 +31,7 @@ export function WeekStrip({
     <div
       data-slot="week-strip"
       data-locked={locked ? "true" : "false"}
-      className="overflow-hidden px-px py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="overflow-hidden px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div role="group" aria-label="Jump to a night" className="flex w-max min-w-full gap-2">
         {cells.map((cell) => {
