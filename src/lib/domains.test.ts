@@ -21,12 +21,26 @@ describe("domain + auth DIY docs", () => {
     expect(domains).toMatch(/Site URL/);
     expect(domains).toMatch(/auth\/callback/);
     expect(domains).toMatch(/does not flip DNS/);
+    expect(domains).toMatch(/Email OTP/);
+    expect(domains).toMatch(/Send code/);
+    expect(domains).toMatch(/Verify/);
+    expect(domains).toMatch(/\{\{ \.Token \}\}/);
+    expect(domains).toMatch(/custom SMTP/);
+    expect(domains).not.toMatch(/Email me a sign-in link/);
+    expect(domains).not.toMatch(/Enable Email magic link/);
+    expect(domains).not.toMatch(/Gmail’s in-app browser/);
+    expect(domains).not.toMatch(/grandma/i);
     expect(domains).not.toMatch(/\{handle\}\.botmymeals\.com is the DIY/);
     expect(domains).not.toMatch(/timdoes\.botmymeals\.com/);
     expect(domains).not.toMatch(/tim-4dd\.workers\.dev/);
 
     expect(readme).toMatch(/bot-my-meals\.<your-subdomain>\.workers\.dev/);
     expect(readme).toMatch(/docs\/domains\.md/);
+    expect(readme).toMatch(/Email OTP/);
+    expect(readme).toMatch(/Send code/);
+    expect(readme).toMatch(/Verify/);
+    expect(readme).not.toMatch(/Email me a sign-in link/);
+    expect(readme).not.toMatch(/grandma/i);
     expect(readme).not.toMatch(/timdoes\.botmymeals\.com/);
     expect(readme).not.toMatch(/tim-4dd\.workers\.dev/);
   });

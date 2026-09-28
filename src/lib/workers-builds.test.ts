@@ -18,6 +18,16 @@ describe("Workers Builds deploy docs", () => {
     const readme = readRepo("README.md");
 
     expect(readme).not.toMatch(/grandma/i);
+    expect(readme).toMatch(/Email OTP/);
+    expect(readme).toMatch(/Send code/);
+    expect(readme).toMatch(/Verify/);
+    expect(readme).toMatch(/\{\{ \.Token \}\}/);
+    expect(readme).toMatch(/custom SMTP/);
+    expect(readme).not.toMatch(/Email me a sign-in link/);
+    expect(readme).not.toMatch(/Enable Email magic link/);
+    expect(readme).not.toMatch(/Gmail’s in-app browser/);
+    expect(readme).toMatch(/cart adds only where the store actually supports them/);
+    expect(readme).toMatch(/Do NOT invent prices/);
 
     expect(docs).toMatch(/npm run build:worker/);
     expect(docs).toMatch(/node scripts\/cf-deploy\.mjs/);

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { grokPromptPaste } from "./install-docs";
 import {
   authCallbackRedirectPath,
   legacyAuthCallbackUrl,
@@ -188,15 +189,26 @@ describe("install paste for OTP", () => {
   it("documents SMTP and {{ .Token }} and does not teach a mail-link happy path", () => {
     const readme = readFileSync(path.join(srcRoot, "../README.md"), "utf8");
     const domains = readFileSync(path.join(srcRoot, "../docs/domains.md"), "utf8");
-    for (const doc of [readme, domains]) {
+    const paste = grokPromptPaste(readme);
+    for (const doc of [readme, domains, paste]) {
       expect(doc).toMatch(/\{\{ \.Token \}\}/);
       expect(doc).toMatch(/custom SMTP/);
       expect(doc).toMatch(/Send code/);
+      expect(doc).toMatch(/Verify/);
       expect(doc).not.toMatch(/Email me a sign-in link/);
+      expect(doc).not.toMatch(/Enable Email magic link/);
       expect(doc).not.toMatch(/Gmail’s in-app browser/);
       expect(doc).not.toMatch(/grandma/i);
     }
+    expect(readme).toMatch(/Email OTP/);
     expect(readme).toMatch(/auth\/callback/);
+    expect(readme).toContain('id="grok-prompt"');
+    expect(domains).toMatch(/Email OTP/);
     expect(domains).toMatch(/Site URL/);
+    expect(paste).toMatch(/Email OTP/);
+    expect(paste).toMatch(/not magic-link-only/);
+    expect(paste).toMatch(/easy for anyone/);
+    expect(paste).toMatch(/cart adds only where the store actually supports them/);
+    expect(paste).toMatch(/Do NOT invent prices/);
   });
 });

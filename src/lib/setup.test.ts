@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { grokPromptPaste } from "./install-docs";
 import {
   BACKEND_SETUP_CTA,
   BACKEND_SETUP_HELPER,
@@ -116,11 +117,16 @@ describe("setup surfaces", () => {
     expect(readme).not.toMatch(/and\/or invite/);
     expect(readme).not.toMatch(/paste-code/);
     expect(readme).toMatch(/via share sheet/);
+    expect(readme).toMatch(/Email OTP/);
     expect(readme).toMatch(/Send code/);
+    expect(readme).toMatch(/Verify/);
     expect(readme).toMatch(/\{\{ \.Token \}\}/);
     expect(readme).toMatch(/custom SMTP/);
+    expect(readme).toContain('id="grok-prompt"');
     expect(readme).not.toMatch(/Email me a sign-in link/);
+    expect(readme).not.toMatch(/Enable Email magic link/);
     expect(readme).not.toMatch(/Gmail’s in-app browser/);
+    expect(readme).not.toMatch(/open the (?:magic )?link on this same phone/i);
     expect(readme).toMatch(/Create this week's meals/);
     expect(readme).toMatch(/Waiting for your Bot…/);
     expect(readme).toMatch(/Finish house setup/);
@@ -150,6 +156,20 @@ describe("setup surfaces", () => {
     const appReadme = readFileSync(path.join(srcRoot, "../README.md"), "utf8");
     expect(appReadme).not.toMatch(/grandma/i);
     expect(appReadme).toMatch(/easy for anyone/);
+    expect(existsSync(path.join(srcRoot, "../apps/app/README.md"))).toBe(false);
+
+    const paste = grokPromptPaste(readme);
+    expect(paste).toMatch(/Email OTP/);
+    expect(paste).toMatch(/Send code/);
+    expect(paste).toMatch(/Verify/);
+    expect(paste).toMatch(/\{\{ \.Token \}\}/);
+    expect(paste).toMatch(/custom SMTP/);
+    expect(paste).toMatch(/not magic-link-only/);
+    expect(paste).not.toMatch(/Email me a sign-in link/);
+    expect(paste).not.toMatch(/Enable Email magic link/);
+    expect(paste).not.toMatch(/grandma/i);
+    expect(paste).toMatch(/cart adds only where the store actually supports them/);
+    expect(paste).toMatch(/Do NOT invent prices/);
   });
 
   it("shows the backend setup gate when Supabase env is missing", () => {

@@ -117,11 +117,11 @@ The app needs **all nine** files under [`supabase/migrations/`](supabase/migrati
 
 Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create). File 9 stores Bot check frequency (`bot_check_mode` defaults to `adaptive`; fixed checks use `bot_check_interval_hours` of 1, 3, or 6).
 
-### 5. Auth: email code (OTP), Site URL, SMTP, and `{{ .Token }}`
+### 5. Auth: Email OTP, Site URL, SMTP, and `{{ .Token }}`
 
 Do this only after you know the final HTTPS origin from step 2.
 
-People sign in by typing a **6-digit code** in the app — the installed Home Screen app, or the Safari tab you will Add to Home Screen. They tap **Send code**, read the digits from email, and type them in that same app. They do not finish sign-in by tapping a link in Mail. On iPhone, Mail opens links in Safari, and the installed app does not share Safari’s cookies.
+**Install sign-in is Email OTP.** People type a **6-digit code** in the app — the installed Home Screen app, or the Safari tab you will Add to Home Screen. They tap **Send code**, read the digits from email, and type them in that same app. They do not finish sign-in by tapping a link in Mail. Magic-link-only is not the Install path.
 
 In Supabase → **Authentication**:
 
@@ -244,6 +244,8 @@ Row Level Security is household-scoped (`household_id`). Admins manage membershi
 
 This hosting guide does **not** require creating a Grok Bot. Teammate / bot setup is separate. If you already have a helper bot, you can paste:
 
+<a id="grok-prompt"></a>
+
 ```
 Set up Bot My Meals for our household. Use only free Cloudflare Workers + Supabase Free — no localStorage/demo-only path.
 
@@ -252,7 +254,7 @@ Do this, one decision at a time if you need me to click:
 1) Help me create a Cloudflare account and deploy the Worker named bot-my-meals from https://github.com/timdoes/bot-my-meals via Workers Builds (Cloudflare dashboard → connect GitHub). Terminal npm run deploy only if I already develop.
 2) Create a new Supabase Free project.
 3) Run every file in supabase/migrations/ in filename order (SQL editor or supabase db push).
-4) Turn on Email sign-in. Use codes (OTP) so people type a 6-digit code in the app and stay in the PWA — not magic-link-only. Set Site URL and /auth/callback to our HTTPS origin (our workers.dev or our own domain — not {handle}.botmymeals.com). Add custom SMTP so codes deliver. In the Auth email template that sends the code, include {{ .Token }} so the email shows the digits. Optional later: passwords. Do not turn on Apple/Google for Install. Passkeys later.
+4) Turn on Email sign-in (Email OTP). Use codes so people type a 6-digit code in the app and stay in the PWA — not magic-link-only. Set Site URL and /auth/callback to our HTTPS origin (our workers.dev or our own domain — not {handle}.botmymeals.com). Add custom SMTP so codes deliver. In the Auth email template that sends the code, include {{ .Token }} so the email shows the digits. Optional later: passwords. Do not turn on Apple/Google for Install. Passkeys later.
 5) Set only these two public Worker env vars, then redeploy: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never use the service-role key.
 6) Give me the HTTPS link, walk me through Add to Home Screen, create the household Admin, finish the 7-step setup, then add my partner (share the /join/<token> link; House → People still works).
 

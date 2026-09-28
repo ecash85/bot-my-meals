@@ -26,16 +26,16 @@ Do **not** set Site URL to someone else’s house. Do **not** add `{handle}.botm
 
 The code typed in the app does **not** depend on opening a mail link. Keep `/auth/callback` on the allowlist for a leftover link or a join deep link. If that old link fails, the app asks them to send a new code on this phone.
 
-## Email code on phones
+## Email OTP on phones
 
-Sign-in is a 6-digit code typed in the app (installed PWA, or the Safari tab you add to the Home Screen).
+**Install sign-in is Email OTP** — a 6-digit code typed in the app (installed PWA, or the Safari tab you add to the Home Screen). Magic-link-only is not the Install path.
 
 1. Open **your** HTTPS origin (not a marketing apex).
 2. Tap **Send code**. Read the 6-digit code from email. Type it in the same app and tap **Verify**.
 3. You stay signed in here. Then confirm the week, House people, and that both adults can sign in.
-4. Partner join is `/join/<token>` only. They use **their** email and the same code — not a magic link to finish.
+4. Partner join is `/join/<token>` only. They use **their** email and the same **Send code → Verify** path — not a magic link to finish.
 
-On iPhone, Mail opens `https://` links in Safari, and the installed app does not share Safari’s cookies. Do not use a magic link as the way people finish sign-in. Do not turn on Apple, Google, or other SSO for Install. Passwords are optional later. Passkeys are not part of Install.
+Do not use a magic link as the way people finish sign-in. Do not turn on Apple, Google, or other SSO for Install. Passwords are optional later. Passkeys are not part of Install.
 
 ## Custom SMTP and `{{ .Token }}`
 
