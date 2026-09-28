@@ -2,40 +2,29 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { JOIN_CTA, JOIN_HELPER, JOIN_HOUSE_SAMPLE, JOIN_TITLE, joinInviteBody } from "./join";
-import {
-  CHECK_EMAIL_DIFFERENT,
-  CHECK_EMAIL_HELPER,
-  CHECK_EMAIL_RESEND,
-  CHECK_EMAIL_STATUS,
-  CHECK_EMAIL_TITLE,
-  checkEmailBody,
-} from "./login";
+import { OTP_DIFFERENT, OTP_RESEND, OTP_TITLE, otpSentBody } from "./login";
 import { CREATE_HOUSE_BODY, CREATE_HOUSE_DEFAULT_NAME, CREATE_HOUSE_TITLE } from "./setup";
 
 const srcRoot = path.resolve(import.meta.dirname, "..");
 
 describe("setup polish copy lock", () => {
-  it("keeps magic-link sent as a confirmation card, not a primary Link sent button", () => {
-    expect(CHECK_EMAIL_TITLE).toBe("Check your email");
-    expect(checkEmailBody("alex@example.com")).toBe(
-      "We sent a sign-in link to alex@example.com. Open it on this same phone (Safari, not Gmail’s in-app browser).",
-    );
-    expect(CHECK_EMAIL_HELPER).toBe(
-      "Opening the link on another device sends you back here.",
-    );
-    expect(CHECK_EMAIL_RESEND).toBe("Resend");
-    expect(CHECK_EMAIL_DIFFERENT).toBe("Use a different email");
-    expect(CHECK_EMAIL_STATUS).toBe("Link on its way");
+  it("keeps the emailed code as an in-app step, not a Link sent button", () => {
+    expect(OTP_TITLE).toBe("Enter your code");
+    expect(otpSentBody("alex@example.com")).toBe("We sent a code to alex@example.com.");
+    expect(OTP_RESEND).toBe("Resend code");
+    expect(OTP_DIFFERENT).toBe("Use a different email");
 
     const login = readFileSync(path.join(srcRoot, "components/login-home.tsx"), "utf8");
-    const card = readFileSync(path.join(srcRoot, "components/check-email-card.tsx"), "utf8");
-    expect(login).toContain("CheckEmailCard");
+    const form = readFileSync(path.join(srcRoot, "components/email-otp-form.tsx"), "utf8");
+    expect(login).toContain("EmailOtpForm");
     expect(login).not.toContain("Link sent");
-    expect(card).toContain('data-slot="check-email"');
-    expect(card).toContain('role="status"');
-    expect(card).toContain('variant="link"');
-    expect(card).not.toContain('variant="primary"');
-    expect(card).not.toContain("Link sent");
+    expect(login).not.toContain("CheckEmailCard");
+    expect(form).toContain('data-slot="email-otp"');
+    expect(form).toContain('role="alert"');
+    expect(form).toContain('variant="ghost"');
+    expect(form).not.toContain('variant="primary"');
+    expect(form).not.toContain("Link sent");
+    expect(form).not.toMatch(/Safari|grandma/i);
   });
 
   it("kills invite-code UI and keeps first-timers on one create path", () => {

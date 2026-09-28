@@ -36,7 +36,7 @@ export function ManagePeople() {
       <h2 className="type-section text-primary">People</h2>
       <p className="type-meta mt-1 text-muted-foreground">
         Admins manage the house. Users can swap or remove a night — no tap leaves the dinner as-is. Add
-        someone by name and email, or share the invite link above. They sign in with a magic link.
+        someone by name and email, or share the invite link above. They sign in with an email code.
       </p>
 
       <ul className="mt-4 space-y-3">
@@ -213,7 +213,7 @@ export function ManagePeople() {
           {busy ? "Adding…" : "Save invite"}
         </Button>
         <p className="type-meta text-muted-foreground">
-          They sign in themselves with a magic link. The share link above is the easy path. Bot My
+          They sign in themselves with a code in the app. The share link above is the easy path. Bot My
           Meals does not email the invite from here.
         </p>
         {error ? <p className="type-meta text-destructive">{error}</p> : null}

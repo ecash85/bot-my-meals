@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import { Utensils } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { BackendSetupGate } from "@/components/backend-setup-gate";
-import { CheckEmailCard } from "@/components/check-email-card";
+import { EmailOtpForm } from "@/components/email-otp-form";
 import { HouseCard } from "@/components/house-card";
 import { useSupper } from "@/components/supper-provider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { JoinPeek, JoinTokenStatus } from "@/lib/join";
 import {
   JOIN_CTA,
@@ -21,14 +20,12 @@ import {
   joinPath,
   joinTokenReason,
 } from "@/lib/join";
-import { LOGIN_SAME_DEVICE_COPY, LOGIN_SAME_DEVICE_HELPER } from "@/lib/login";
 
 export function JoinLanding({ token }: { token: string }) {
   const {
     mode,
     ready,
     session,
-    signInMagicLink,
     peekJoinToken,
     claimJoinToken,
   } = useSupper();
@@ -37,8 +34,6 @@ export function JoinLanding({ token }: { token: string }) {
   const [peek, setPeek] = useState<JoinPeek | null>(
     tokenLooksValid ? null : { status: "invalid" },
   );
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,39 +89,8 @@ export function JoinLanding({ token }: { token: string }) {
   const reason = peek ? joinTokenReason(status) : "";
   const houseName = peek?.householdName?.trim() || JOIN_HOUSE_SAMPLE;
 
-  const sendLink = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await signInMagicLink(email.trim(), { next: joinPath(token) });
-      setSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send a link");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <AppShell title={JOIN_TITLE} eyebrow="Bot My Meals" hideNav>
-      {sent ? (
-        <div data-slot="join-landing">
-          <CheckEmailCard
-            email={email.trim()}
-            busy={busy}
-            onResend={() => void sendLink()}
-            onDifferentEmail={() => {
-              setSent(false);
-              setError(null);
-            }}
-          />
-          {error ? (
-            <p className="type-meta mt-3 text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </div>
-      ) : (
       <HouseCard data-slot="join-landing">
         {!ready || peek == null ? (
           <p className="type-body text-muted-foreground" role="status">
@@ -178,13 +142,7 @@ export function JoinLanding({ token }: { token: string }) {
             </Button>
           </div>
         ) : (
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void sendLink();
-            }}
-          >
+          <div className="space-y-3">
             <div className="flex flex-col items-center text-center">
               <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-primary">
                 <Utensils className="size-5" aria-hidden />
@@ -195,32 +153,8 @@ export function JoinLanding({ token }: { token: string }) {
               <p className="type-body mt-4 text-muted-foreground">{joinInviteBody(houseName)}</p>
               <p className="type-meta mt-3 text-muted-foreground">{JOIN_HELPER}</p>
             </div>
-            <Input
-              type="email"
-              required
-              inputMode="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="h-12 min-h-12 rounded-[var(--radius-button)] bg-card text-base"
-              aria-label="Email address"
-            />
-            <Button
-              type="submit"
-              size="fat"
-              className="w-full"
-              disabled={busy}
-              aria-label={busy ? "Sending…" : "Email me a sign-in link"}
-              aria-busy={busy}
-            >
-              {busy ? "Sending…" : "Email me a sign-in link"}
-            </Button>
-            <div>
-              <p className="type-body text-muted-foreground">{LOGIN_SAME_DEVICE_COPY}</p>
-              <p className="type-meta mt-1 text-muted-foreground">{LOGIN_SAME_DEVICE_HELPER}</p>
-            </div>
-          </form>
+            <EmailOtpForm next={joinPath(token)} showIntro={false} />
+          </div>
         )}
         {error ? (
           <p className="type-meta mt-3 text-destructive" role="alert">
@@ -228,7 +162,6 @@ export function JoinLanding({ token }: { token: string }) {
           </p>
         ) : null}
       </HouseCard>
-      )}
     </AppShell>
   );
 }

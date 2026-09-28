@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/week";
   const supabase = await createSupabaseServerClient();
 
-  let exchangeFailed = false;
+  let exchangeFailed = !code || !supabase;
   if (code && supabase) {
     try {
       const { error } = await supabase.auth.exchangeCodeForSession(code);

@@ -24,13 +24,33 @@ On **your** Supabase project:
 
 Do **not** set Site URL to someone else’s house. Do **not** add `{handle}.botmymeals.com` wildcards for DIY.
 
-## Magic link on phones
+The code typed in the app does **not** depend on opening a mail link. Keep `/auth/callback` on the allowlist for a leftover link or a join deep link. If that old link fails, the app asks them to send a new code on this phone.
+
+## Email code on phones
+
+Sign-in is a 6-digit code typed in the app (installed PWA, or the Safari tab you add to the Home Screen).
 
 1. Open **your** HTTPS origin (not a marketing apex).
-2. **Request the link on this phone, then open the email on this same phone.** Opening the link on another device sends you back to login.
-3. Open the magic link in **Safari on the same phone** that requested it. Opening it in **Gmail’s in-app browser** (or on another device) can bounce you back to login / fail PKCE.
-4. Land in the household (same Supabase project).
-5. Confirm the week, House people, and that both adults can sign in.
+2. Tap **Send code**. Read the 6-digit code from email. Type it in the same app and tap **Verify**.
+3. You stay signed in here. Then confirm the week, House people, and that both adults can sign in.
+4. Partner join is `/join/<token>` only. They use **their** email and the same code — not a magic link to finish.
+
+On iPhone, Mail opens `https://` links in Safari, and the installed app does not share Safari’s cookies. Do not use a magic link as the way people finish sign-in. Do not turn on Apple, Google, or other SSO for Install. Passwords are optional later. Passkeys are not part of Install.
+
+## Custom SMTP and `{{ .Token }}`
+
+Built-in Supabase mail can smoke-test a code. Free is about 2 emails an hour. For a real household, turn on **custom SMTP** (Resend or similar): host, port, user, and password or API key. Sender name ≈ **Bot My Meals**.
+
+The Auth email template that sends the sign-in code **must include `{{ .Token }}`** so the digits show up. Subject like `Your Bot My Meals code`. Body, code first:
+
+```text
+Your sign-in code is {{ .Token }}
+Enter it in the Bot My Meals app. It expires soon.
+```
+
+If a confirmation URL remains for an old link, keep `{{ .Token }}` above it. Do not make “tap this link” the only instruction.
+
+Only these public keys: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. After an env change, rebuild/redeploy. There is no localStorage sign-in.
 
 ## Hard-refresh / Home Screen
 

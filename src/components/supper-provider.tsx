@@ -47,7 +47,7 @@ import {
   supabaseUpdateHousehold,
 } from "@/lib/supabase/repo";
 import type { JoinPeek } from "@/lib/join";
-import { safeAuthNext } from "@/lib/login";
+import { legacyAuthCallbackUrl } from "@/lib/login";
 import type {
   HouseholdSettingsPatch,
   HouseholdSnapshot,
@@ -72,7 +72,8 @@ type SupperContextValue = {
   snapshot: HouseholdSnapshot | null;
   error: string | null;
   refresh: () => Promise<void>;
-  signInMagicLink: (email: string, options?: { next?: string }) => Promise<void>;
+  sendEmailOtp: (email: string, options?: { next?: string }) => Promise<void>;
+  verifyEmailOtp: (email: string, token: string) => Promise<void>;
   bootstrapHousehold: (input: {
     householdName: string;
     displayName: string;
@@ -122,7 +123,8 @@ function createSetupContext(): SupperContextValue {
     snapshot: null,
     error: null,
     refresh: async () => {},
-    signInMagicLink: async () => setupUnavailable(),
+    sendEmailOtp: async () => setupUnavailable(),
+    verifyEmailOtp: async () => setupUnavailable(),
     bootstrapHousehold: async () => setupUnavailable(),
     addMember: async () => setupUnavailable(),
     updateMemberRole: async () => setupUnavailable(),
@@ -372,19 +374,32 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client || !session) throw new Error("Not signed in");
           await supabaseRemoveInvite(client, session, inviteId);
         }),
-      signInMagicLink: async (email, options) => {
+      sendEmailOtp: async (email, options) => {
         const client = createSupabaseBrowserClient();
         if (!client) throw new Error("Supabase is not configured.");
-        const next = safeAuthNext(options?.next);
-        const redirect =
-          next === "/week"
-            ? `${window.location.origin}/auth/callback`
-            : `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
         const { error: authError } = await client.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: redirect },
+          options: {
+            shouldCreateUser: true,
+            emailRedirectTo: legacyAuthCallbackUrl(window.location.origin, options?.next),
+          },
         });
-        if (authError) throw new Error(authError.message);
+        if (authError) throw authError;
+      },
+      verifyEmailOtp: async (email, token) => {
+        const client = createSupabaseBrowserClient();
+        if (!client) throw new Error("Supabase is not configured.");
+        const { error: authError } = await client.auth.verifyOtp({
+          email,
+          token,
+          type: "email",
+        });
+        if (authError) throw authError;
+        try {
+          await refresh();
+        } catch {
+          // The session cookie is already in this app. Household load can fail on its own screen.
+        }
       },
       signOut: () =>
         run(async () => {

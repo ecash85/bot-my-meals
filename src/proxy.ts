@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicSupabaseConfig } from "@/lib/config";
+import { supabaseAuthCookieOptions } from "@/lib/supabase/auth-cookies";
 
 export async function proxy(request: NextRequest) {
   const config = getPublicSupabaseConfig();
@@ -8,6 +9,7 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(config.url, config.anonKey, {
+    cookieOptions: supabaseAuthCookieOptions(request.nextUrl.protocol === "https:"),
     cookies: {
       getAll() {
         return request.cookies.getAll();

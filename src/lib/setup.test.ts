@@ -42,6 +42,9 @@ describe("backend setup gate copy", () => {
     expect(BACKEND_SETUP_STEPS[0].body).toMatch(/\{handle\}\.botmymeals\.com/);
     expect(BACKEND_SETUP_STEPS[1].body).toMatch(/Site URL/);
     expect(BACKEND_SETUP_STEPS[1].body).toMatch(/auth\/callback/);
+    expect(BACKEND_SETUP_STEPS[1].body).toMatch(/\{\{ \.Token \}\}/);
+    expect(BACKEND_SETUP_STEPS[1].body).toMatch(/custom SMTP/);
+    expect(BACKEND_SETUP_STEPS[1].body).not.toMatch(/grandma/i);
     expect(BACKEND_SETUP_STEPS[2].body).toMatch(/Row Level Security/);
     expect(BACKEND_SETUP_STEPS[2].body).toMatch(/supabase\/migrations/);
     expect(BACKEND_SETUP_STEPS[4].body).toMatch(/Add to Home Screen/);
@@ -113,10 +116,11 @@ describe("setup surfaces", () => {
     expect(readme).not.toMatch(/and\/or invite/);
     expect(readme).not.toMatch(/paste-code/);
     expect(readme).toMatch(/via share sheet/);
-    expect(readme).toMatch(/Safari on their phone \(not Gmail’s in-app browser\)/);
-    expect(readme).toMatch(/Check your email/);
-    expect(readme).toMatch(/Safari, not Gmail’s in-app browser/);
-    expect(readme).toMatch(/Opening on another device sends you back to login/);
+    expect(readme).toMatch(/Send code/);
+    expect(readme).toMatch(/\{\{ \.Token \}\}/);
+    expect(readme).toMatch(/custom SMTP/);
+    expect(readme).not.toMatch(/Email me a sign-in link/);
+    expect(readme).not.toMatch(/Gmail’s in-app browser/);
     expect(readme).toMatch(/Create this week's meals/);
     expect(readme).toMatch(/Waiting for your Bot…/);
     expect(readme).toMatch(/Finish house setup/);

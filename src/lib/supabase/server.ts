@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getPublicSupabaseConfig } from "@/lib/config";
+import { cookieSecureFromProto, supabaseAuthCookieOptions } from "@/lib/supabase/auth-cookies";
 
 export function bearerAccessToken(request: Request): string | null {
   const header = request.headers.get("authorization");
@@ -14,10 +15,14 @@ export async function createSupabaseServerClient() {
   const config = getPublicSupabaseConfig();
   if (!config) return null;
   const cookieStore = await cookies();
+  const headerStore = await headers();
   return createServerClient(
     config.url,
     config.anonKey,
     {
+      cookieOptions: supabaseAuthCookieOptions(
+        cookieSecureFromProto(headerStore.get("x-forwarded-proto")),
+      ),
       cookies: {
         getAll() {
           return cookieStore.getAll();

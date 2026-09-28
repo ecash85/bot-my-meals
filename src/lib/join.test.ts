@@ -95,7 +95,7 @@ describe("join invite link", () => {
 });
 
 describe("join landing and House invite surfaces", () => {
-  it("routes /join/<token> through app chrome and same-phone magic link", () => {
+  it("routes /join/<token> through app chrome and an in-app email code", () => {
     const page = readFileSync(path.join(srcRoot, "app/join/[token]/page.tsx"), "utf8");
     const landing = readFileSync(path.join(srcRoot, "components/join-landing.tsx"), "utf8");
     const share = readFileSync(path.join(srcRoot, "components/invite-share.tsx"), "utf8");
@@ -107,9 +107,11 @@ describe("join landing and House invite surfaces", () => {
     expect(landing).toContain("hideNav");
     expect(landing).toContain("JOIN_TITLE");
     expect(landing).toContain("JOIN_CTA");
-    expect(landing).toContain("LOGIN_SAME_DEVICE_COPY");
-    expect(landing).toContain("LOGIN_SAME_DEVICE_HELPER");
-    expect(landing).toContain("CheckEmailCard");
+    expect(landing).toContain("EmailOtpForm");
+    expect(landing).toContain("showIntro={false}");
+    expect(landing).not.toContain("CheckEmailCard");
+    expect(landing).not.toContain("Email me a sign-in link");
+    expect(landing).not.toContain("LOGIN_SAME_DEVICE");
     expect(landing).toContain("joinPath(token)");
     expect(landing).toContain("claimJoinToken");
     expect(landing).toContain("Ask your partner to share a new invite link");
@@ -127,7 +129,10 @@ describe("join landing and House invite surfaces", () => {
 
     expect(house).toContain("InviteShare");
     expect(house).toContain("createJoinToken");
+    expect(provider).toContain("signInWithOtp");
+    expect(provider).toContain("verifyOtp");
+    expect(provider).toContain('type: "email"');
     expect(provider).toContain("emailRedirectTo");
-    expect(provider).toContain("encodeURIComponent(next)");
+    expect(provider).toContain("legacyAuthCallbackUrl");
   });
 });
