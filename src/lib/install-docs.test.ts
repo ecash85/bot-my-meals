@@ -9,20 +9,24 @@ function readRepo(rel: string) {
   return readFileSync(path.join(repoRoot, rel), "utf8");
 }
 
-function expectOtpInstallHappyPath(doc: string) {
-  expect(doc).toMatch(/Email OTP/);
-  expect(doc).toMatch(/Send code/);
-  expect(doc).toMatch(/6-digit/);
-  expect(doc).toMatch(/Verify/);
+function expectPasswordInstallHappyPath(doc: string) {
+  expect(doc).toMatch(/Confirm email OFF/);
+  expect(doc).toMatch(/email \+ password/);
+  expect(doc).toMatch(/Create account/);
+  expect(doc).toMatch(/not a magic link/);
+  expect(doc).toMatch(/Optional later: custom SMTP/);
   expect(doc).toMatch(/\{\{ \.Token \}\}/);
-  expect(doc).toMatch(/custom SMTP/);
   expect(doc).toMatch(/auth\/callback/);
+  expect(doc).not.toMatch(/Email OTP/);
+  expect(doc).not.toMatch(/Send code/);
+  expect(doc).not.toMatch(/Add custom SMTP/);
   expect(doc).not.toMatch(/Email me a sign-in link/);
   expect(doc).not.toMatch(/Enable Email magic link/);
   expect(doc).not.toMatch(/Gmail’s in-app browser/);
   expect(doc).not.toMatch(/open the (?:magic )?link on this same phone/i);
   expect(doc).not.toMatch(/after Request link/);
   expect(doc).not.toMatch(/grandma/i);
+  expect(doc).not.toMatch(/email verified/i);
 }
 
 function expectWakeInstallPaste(paste: string) {
@@ -43,29 +47,29 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).not.toMatch(/grandma/i);
 }
 
-describe("Install docs — Email OTP + Wake on app event", () => {
-  it("locks Auth, domains, and the #grok-prompt paste on Email OTP and Cos webhook wake", () => {
+describe("Install docs — email + password + Wake on app event", () => {
+  it("locks Auth, domains, and the #grok-prompt paste on password sign-in and Cos webhook wake", () => {
     const readme = readRepo("README.md");
     const domains = readRepo("docs/domains.md");
     const routines = readRepo("docs/bot-routines.md");
     const paste = grokPromptPaste(readme);
 
     expect(readme).toContain('id="grok-prompt"');
-    expectOtpInstallHappyPath(readme);
-    expectOtpInstallHappyPath(domains);
-    expectOtpInstallHappyPath(paste);
+    expectPasswordInstallHappyPath(readme);
+    expectPasswordInstallHappyPath(domains);
+    expectPasswordInstallHappyPath(paste);
     expectWakeInstallPaste(paste);
 
-    expect(paste).toMatch(/Email OTP/);
-    expect(paste).toMatch(/Send code/);
-    expect(paste).toMatch(/Verify/);
+    expect(paste).toMatch(/Confirm email OFF/);
+    expect(paste).toMatch(/email \+ password/);
+    expect(paste).toMatch(/Create account/);
     expect(paste).toMatch(/\{\{ \.Token \}\}/);
-    expect(paste).toMatch(/custom SMTP/);
+    expect(paste).toMatch(/Optional later: custom SMTP/);
     expect(paste).toMatch(/auth\/callback/);
     expect(paste).toMatch(/Site URL/);
-    expect(paste).toMatch(/not magic-link-only/);
-    expect(paste).toMatch(/Do not turn on Apple\/Google for Install/);
-    expect(paste).toMatch(/Optional later: passwords/);
+    expect(paste).toMatch(/not a magic link/);
+    expect(paste).toMatch(/Do not turn on Apple or Google for Install/);
+    expect(paste).not.toMatch(/Optional later: passwords/);
     expect(paste).toMatch(/Passkeys later/);
     expect(paste).toMatch(/easy for anyone/);
     expect(paste).toMatch(/cart adds only where the store actually supports them/);

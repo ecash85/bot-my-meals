@@ -1,11 +1,11 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { BallotToast } from "@/components/ballot-toast";
 import { botCheckForSnapshot } from "@/lib/bot-check";
 import { shouldWakeNeedsWork } from "@/lib/bot-wake";
 import { requestBotWake } from "@/lib/bot-wake-client";
-import { isSupabaseConfigured } from "@/lib/config";
 import { storeSlugForAdd } from "@/lib/grocers";
 import { createId } from "@/lib/ids";
 import { todayInTimeZone } from "@/lib/meal-history";
@@ -27,6 +27,8 @@ import {
   type OptimisticPatch,
   type PendingOptimistic,
 } from "@/lib/optimistic";
+import { getPublicSupabaseConfig, isSupabaseConfigured } from "@/lib/config";
+import { PASSWORD_MIN_LENGTH, passwordResetRedirectUrl } from "@/lib/login";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   fetchSupabaseSession,
@@ -50,7 +52,6 @@ import {
   supabaseUpdateHousehold,
 } from "@/lib/supabase/repo";
 import type { JoinPeek } from "@/lib/join";
-import { legacyAuthCallbackUrl } from "@/lib/login";
 import type {
   HouseholdSettingsPatch,
   HouseholdSnapshot,
@@ -64,6 +65,13 @@ import type { MemberDraft } from "@/lib/users";
 
 const SETUP_REQUIRED = "This install is not connected to Supabase yet. Finish setup first.";
 
+/** In-memory only. The reset request must not share or persist the app session. */
+const passwordResetStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
 function actionMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Something went wrong.";
 }
@@ -75,8 +83,10 @@ type SupperContextValue = {
   snapshot: HouseholdSnapshot | null;
   error: string | null;
   refresh: () => Promise<void>;
-  sendEmailOtp: (email: string, options?: { next?: string }) => Promise<void>;
-  verifyEmailOtp: (email: string, token: string) => Promise<void>;
+  signUpWithPassword: (email: string, password: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   bootstrapHousehold: (input: {
     householdName: string;
     displayName: string;
@@ -126,8 +136,10 @@ function createSetupContext(): SupperContextValue {
     snapshot: null,
     error: null,
     refresh: async () => {},
-    sendEmailOtp: async () => setupUnavailable(),
-    verifyEmailOtp: async () => setupUnavailable(),
+    signUpWithPassword: async () => setupUnavailable(),
+    signInWithPassword: async () => setupUnavailable(),
+    requestPasswordReset: async () => setupUnavailable(),
+    updatePassword: async () => setupUnavailable(),
     bootstrapHousehold: async () => setupUnavailable(),
     addMember: async () => setupUnavailable(),
     updateMemberRole: async () => setupUnavailable(),
@@ -391,31 +403,72 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client || !session) throw new Error("Not signed in");
           await supabaseRemoveInvite(client, session, inviteId);
         }),
-      sendEmailOtp: async (email, options) => {
+      signUpWithPassword: async (email, password) => {
+        if (password.length < PASSWORD_MIN_LENGTH) throw new Error("password_too_short");
         const client = createSupabaseBrowserClient();
         if (!client) throw new Error("Supabase is not configured.");
-        const { error: authError } = await client.auth.signInWithOtp({
-          email,
-          options: {
-            shouldCreateUser: true,
-            emailRedirectTo: legacyAuthCallbackUrl(window.location.origin, options?.next),
-          },
+        const { data, error: authError } = await client.auth.signUp({
+          email: email.trim(),
+          password,
         });
         if (authError) throw authError;
-      },
-      verifyEmailOtp: async (email, token) => {
-        const client = createSupabaseBrowserClient();
-        if (!client) throw new Error("Supabase is not configured.");
-        const { error: authError } = await client.auth.verifyOtp({
-          email,
-          token,
-          type: "email",
-        });
-        if (authError) throw authError;
+        const identities = data.user?.identities;
+        if (data.user && Array.isArray(identities) && identities.length === 0) {
+          throw new Error("user_already_exists");
+        }
+        if (!data.session) throw new Error("signup_no_session");
         try {
           await refresh();
         } catch {
           // The session cookie is already in this app. Household load can fail on its own screen.
+        }
+      },
+      signInWithPassword: async (email, password) => {
+        const client = createSupabaseBrowserClient();
+        if (!client) throw new Error("Supabase is not configured.");
+        const { data, error: authError } = await client.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (authError) throw authError;
+        if (!data.session) throw new Error("signin_no_session");
+        try {
+          await refresh();
+        } catch {
+          // The session cookie is already in this app. Household load can fail on its own screen.
+        }
+      },
+      requestPasswordReset: async (email) => {
+        const config = getPublicSupabaseConfig();
+        if (!config) throw new Error("Supabase is not configured.");
+        // Default recovery mail is a link. Skip PKCE so that link can set a
+        // password in the browser that opens it (often not the Home Screen app).
+        const mailer = createClient(config.url, config.anonKey, {
+          auth: {
+            flowType: "implicit",
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storageKey: "bot-my-meals-password-reset",
+            storage: passwordResetStorage,
+          },
+        });
+        const { error: authError } = await mailer.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: passwordResetRedirectUrl(window.location.origin),
+        });
+        if (authError) throw authError;
+      },
+      updatePassword: async (password) => {
+        if (password.length < PASSWORD_MIN_LENGTH) throw new Error("password_too_short");
+        const client = createSupabaseBrowserClient();
+        if (!client) throw new Error("Supabase is not configured.");
+        const { error: authError } = await client.auth.updateUser({ password });
+        if (authError) throw authError;
+        await client.auth.signOut();
+        try {
+          await refresh();
+        } catch {
+          // Signed out. The Home Screen app signs in with the new password.
         }
       },
       signOut: () =>

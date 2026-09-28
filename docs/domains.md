@@ -24,31 +24,32 @@ On **your** Supabase project:
 
 Do **not** set Site URL to someone else’s house. Do **not** add `{handle}.botmymeals.com` wildcards for DIY.
 
-The code typed in the app does **not** depend on opening a mail link. Keep `/auth/callback` on the allowlist for a leftover link or a join deep link. If that old link fails, the app asks them to send a new code on this phone.
+Create account and Sign in finish in the app. They do **not** depend on opening a mail link. Also allow:
 
-## Email OTP on phones
+- `https://<your-host>/login/new-password`
 
-**Install sign-in is Email OTP** — a 6-digit code typed in the app (installed PWA, or the Safari tab you add to the Home Screen). Magic-link-only is not the Install path.
+## Email and password on phones
+
+**Install sign-in is email + password** inside the app (installed PWA, or the Safari tab you add to the Home Screen). People use email + password in the app — not a magic link.
 
 1. Open **your** HTTPS origin (not a marketing apex).
-2. Tap **Send code**. Read the 6-digit code from email. Type it in the same app and tap **Verify**.
-3. You stay signed in here. Then confirm the week, House people, and that both adults can sign in.
-4. Partner join is `/join/<token>` only. They use **their** email and the same **Send code → Verify** path — not a magic link to finish.
+2. Tap **Create account**. Enter an email and a password (at least 8 characters). You stay in this app.
+3. Sign out, then **Sign in** with the same email and password.
+4. Partner join is `/join/<token>` only. They **Create account** with **their** email and password (or **Sign in**). There is no shared household password.
 
-Do not use a magic link as the way people finish sign-in. Do not turn on Apple, Google, or other SSO for Install. Passwords are optional later. Passkeys are not part of Install.
+Do not use a magic link as the way people finish sign-in. Do not turn on Apple, Google, or other SSO for Install. Passkeys are not part of Install.
 
-## Custom SMTP and `{{ .Token }}`
+Turn **Confirm email OFF**. With it on, the first sign-up waits on a link that opens outside the Home Screen app. Do not treat that as proof they own the inbox.
 
-Built-in Supabase mail can smoke-test a code. Free is about 2 emails an hour. For a real household, turn on **custom SMTP** (Resend or similar): host, port, user, and password or API key. Sender name ≈ **Bot My Meals**.
+## Forgot password
 
-The Auth email template that sends the sign-in code **must include `{{ .Token }}`** so the digits show up. Subject like `Your Bot My Meals code`. Body, code first:
+**Send reset link** emails a link. That link may open in the phone’s browser. Set the new password, then open Bot My Meals from the Home Screen and **sign in**.
 
-```text
-Your sign-in code is {{ .Token }}
-Enter it in the Bot My Meals app. It expires soon.
-```
+On Free’s built-in mail, reset messages may only reach the Supabase project’s team addresses, about 2 an hour. Until custom SMTP, ask a household partner for a new invite if you can’t get into email.
 
-If a confirmation URL remains for an old link, keep `{{ .Token }}` above it. Do not make “tap this link” the only instruction.
+## Optional later: sign-in codes
+
+Not required to install. Optional later: custom SMTP + a code in the email template (`{{ .Token }}`) for sign-in codes. Keep email + password. Do not turn Confirm email ON with a link-only template.
 
 Only these public keys: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. After an env change, rebuild/redeploy. There is no localStorage sign-in.
 

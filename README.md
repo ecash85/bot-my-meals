@@ -117,35 +117,31 @@ The app needs **all nine** files under [`supabase/migrations/`](supabase/migrati
 
 Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create). File 9 stores Bot check frequency (`bot_check_mode` defaults to `adaptive`; fixed checks use `bot_check_interval_hours` of 1, 3, or 6).
 
-### 5. Auth: Email OTP, Site URL, SMTP, and `{{ .Token }}`
+### 5. Auth: Email on, Confirm email OFF
 
 Do this only after you know the final HTTPS origin from step 2.
 
-**Install sign-in is Email OTP.** People type a **6-digit code** in the app — the installed Home Screen app, or the Safari tab you will Add to Home Screen. They tap **Send code**, read the digits from email, and type them in that same app. They do not finish sign-in by tapping a link in Mail. Magic-link-only is not the Install path.
+**Install sign-in is email + password** in the app — the installed Home Screen app, or the Safari tab you will Add to Home Screen. People tap **Create account** or **Sign in** and stay in that app. They do not finish sign-in by tapping a link in Mail. People use email + password in the app — not a magic link.
 
 In Supabase → **Authentication**:
 
-1. **Providers → Email** on. Install uses **codes (OTP)**. Do not make magic-link-only the way people sign in. Do not turn on Apple, Google, or other SSO.
-2. **Site URL** = the **same** HTTPS origin phones will open.
-3. **Redirect URLs** include `https://<that-host>/auth/callback` for a leftover link or a join deep link. The code itself does not depend on opening that URL.
-4. **Custom SMTP** for a real household. Built-in Supabase mail is only a smoke test (Free is about 2 emails an hour). Open **Emails** / SMTP and paste host, port, user, and password or API key from your mail provider. Sender name ≈ **Bot My Meals**. Send a test code after you save.
-5. The Auth **email template** that sends the sign-in code **must include `{{ .Token }}`** so the digits show up. Subject like `Your Bot My Meals code`. Body, code first:
+1. **Providers → Email** on.
+2. **Confirm email: OFF.** Required so **Create account** returns a session in the app (important on iPhone Home Screen). Do not treat that as proof they own the inbox.
+3. **Site URL** = the **same** HTTPS origin phones will open.
+4. **Redirect URLs** include `https://<that-host>/auth/callback` and `https://<that-host>/login/new-password` for password reset (and a leftover link).
+5. If a password minimum is shown, set it to **at least 8**.
+6. Skip Google, Apple, and other SSO.
 
-```text
-Your sign-in code is {{ .Token }}
-Enter it in the Bot My Meals app. It expires soon.
-```
-
-If a confirmation URL is still in the template for an old link, keep `{{ .Token }}` above it. Do not make “tap this link” the only instruction.
+Do **not** set up custom SMTP or edit Auth email templates to install. Optional later: custom SMTP + a code in the email template (`{{ .Token }}`) for sign-in codes. Keep email + password if you add that. Do not turn Confirm email ON with a link-only template.
 
 Examples for Site URL / Redirect URL:
 
-- DIY: your workers.dev or your domain and `https://<that-host>/auth/callback`
+- DIY: your workers.dev or your domain, `https://<that-host>/auth/callback`, and `https://<that-host>/login/new-password`
 - Keep workers.dev on the allowlist if anyone still opens that host
 
-**Set Site URL to the final phone URL before anyone taps Send code.** Changing the host later means updating Auth and sending a new code.
+**Set Site URL to the final phone URL before anyone taps Create account.** Changing the host later means updating Auth.
 
-Sign-in email is the **only** email path (Supabase Auth). Bot My Meals does not send any other email. A password is optional later — not the first install. Passkeys are not part of install. Only the two public keys in the next step; there is no localStorage sign-in.
+Forgot password emails a link. It may open in the phone’s browser. Set the new password, then open the Home Screen app and sign in. Free built-in mail may only reach the project’s team addresses (about 2 an hour) until custom SMTP. A partner invite is the reliable way back in. Passkeys are not part of install. Only the two public keys in the next step; there is no localStorage sign-in. Leaked-password checks are a paid Supabase option, not part of Free Install.
 
 ### 6. Set the two public env vars, then rebuild / redeploy
 
@@ -174,9 +170,9 @@ Admin and partner sign-in still need Auth + the two env vars (steps 5–6). If y
 
 Auth + env first. Then, on that phone:
 
-1. Enter an email and tap **Send code**.
-2. Read the 6-digit code in your email and type it in this same app. Tap **Verify**. You can stay in the installed app.
-3. After sign-in you will see **Create household**.
+1. Tap **Create account**.
+2. Enter your email and a password of at least 8 characters. You stay in this app — no mail to open.
+3. After that you will see **Create household**.
 4. Enter a household name and tap **Create household**.
 5. Walk the **7-step house setup** below (progress: **Setup · step N of 7**, saved on the household). There is no Seed / sample week.
 
@@ -188,11 +184,11 @@ A household is a **Supabase row** on this same Worker — not a second Worker.
 
 #### After Create household: house setup
 
-After **Send code**, type the 6-digit code in this app and tap **Verify**.
+After **Create account**, you are signed in on this phone.
 
 Walk through house setup (no Seed / sample week). Progress is **Setup · step N of 7**.
 
-1. **Invite people** — share `https://<our-host>/join/<token>` via share sheet (invite links only). Partner opens the link, then signs in with a code to **their** email in the app.
+1. **Invite people** — share `https://<our-host>/join/<token>` via share sheet (invite links only). Partner opens the link, then creates an account with their own email and password (or signs in). There is no shared household password.
 2. **How many people?** — household size stepper.
 3. **Which nights?** — Sun–Sat toggles, all on by default. Easy off per day.
 4. **Optional:** adjust plates on On nights (guests / couple nights).
@@ -208,7 +204,7 @@ Empty This week: **Finish house setup** (if incomplete), **Create this week's me
 
 ### 9. Add the other adult
 
-Share the textable invite link from setup step 1 or **House → Invite** (**Share invite link**). The URL looks like `https://<host>/join/<token>`. Optional share text: “Join our Bot My Meals house — open this on your phone:” plus the URL. Invite links only — there is no code to type. Partner opens the link on their phone, then signs in with a code to their own email.
+Share the textable invite link from setup step 1 or **House → Invite** (**Share invite link**). The URL looks like `https://<host>/join/<token>`. Optional share text: “Join our Bot My Meals house — open this on your phone:” plus the URL. Invite links only — there is no code to type. Partner opens the link on their phone, then creates their own account.
 
 You can still **House → People** → **Add a person** (name, email, Admin or User). They appear under **Waiting to sign in** until they sign in. Bot My Meals does not email this invite. There is no SMS gateway.
 
@@ -216,7 +212,7 @@ On the second phone they:
 
 1. Open the **invite link** on that phone (or the same HTTPS origin, then sign in).
 2. Add to Home Screen if they want (Safari **Share → Add to Home Screen**) — they do not need a household first.
-3. New person: tap **Send code** with **their** email in the app (needs Auth + env). Type the 6-digit code there and tap **Verify**. The app claims the invite and puts them in the house.
+3. New person: **Create account** with **their** email and password in the app (or **Sign in** if they already have one). The app claims the invite and puts them in the house. There is no shared household password.
 4. Already signed in: tap **Continue**.
 5. Expired, used, or invalid link: the page says why and asks them to get a new link.
 
@@ -230,7 +226,9 @@ Row Level Security is household-scoped (`household_id`). Admins manage membershi
 - **Stuck on Create household.** Create household can look like it worked (or fail with no message) while you never enter This week / House. Likely cause: migrations incomplete — `authenticated` needs `USAGE` on schema `private`. Run every file in [step 4](#4-run-every-migration-in-filename-order) in order, including `20260917120000_grant_private_schema_usage.sql`, then hard-refresh.
 - **Vars need a rebuild.** After setting the two public keys, rebuild/redeploy so Next inlines them.
 - **`npm run deploy` is not the easy household path.** If you already develop: it only promotes production from `main`; any other branch → preview upload only (`wrangler versions upload`).
-- **Sign-in codes are the only email.** Supabase Auth sends a 6-digit code when someone taps **Send code**. House → People does not email anyone. The template must include `{{ .Token }}`. Use custom SMTP so those codes arrive (Free built-in mail is about 2 an hour).
+- **Confirm email stays OFF.** Create account and Sign in happen in the app. A confirm link opens outside the Home Screen app. Do not treat that as proof they own the inbox.
+- **Forgot password uses a link.** Set the new password in the browser that opens the email, then open the Home Screen app and sign in. Free built-in mail may only reach the project’s team addresses until custom SMTP. Ask a partner for a new invite if email doesn’t arrive. House → People does not email anyone.
+- **Optional later: custom SMTP** plus `{{ .Token }}` in the Auth email template for sign-in codes. Not required to install.
 - **RLS is household-scoped.** Other families cannot see this table. The last Admin cannot be removed or demoted.
 - **One Worker name.** Script name `bot-my-meals`. Same Cloudflare account → name collision if you try to reuse it. Households are extra Supabase rows, not extra Workers.
 
@@ -256,14 +254,14 @@ Do this, one decision at a time if you need me to click:
 1) Help me create a Cloudflare account and deploy the Worker named bot-my-meals from https://github.com/timdoes/bot-my-meals via Workers Builds (Cloudflare dashboard → connect GitHub). Terminal npm run deploy only if I already develop.
 2) Create a new Supabase Free project.
 3) Run every file in supabase/migrations/ in filename order (SQL editor or supabase db push).
-4) Turn on Email sign-in (Email OTP). Use codes so people type a 6-digit code in the app and stay in the PWA — not magic-link-only. Set Site URL and /auth/callback to our HTTPS origin (our workers.dev or our own domain — not {handle}.botmymeals.com). Add custom SMTP so codes deliver. In the Auth email template that sends the code, include {{ .Token }} so the email shows the digits. Optional later: passwords. Do not turn on Apple/Google for Install. Passkeys later.
+4) Turn on Email sign-in. Turn Confirm email OFF so people create an account and stay in the app (important on iPhone Home Screen). Set Site URL to our HTTPS origin, and add /auth/callback and /login/new-password (our workers.dev or our own domain — not {handle}.botmymeals.com). People use email + password in the app — not a magic link. Optional later: custom SMTP + a code in the email template ({{ .Token }}) for sign-in codes. Do not turn on Apple or Google for Install. Passkeys later.
 5) Set only these two public Worker env vars, then redeploy: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never use the service-role key.
 6) Give me the HTTPS link, walk me through Add to Home Screen, create the household Admin, finish the 7-step setup, then add my partner (share the /join/<token> link; House → People still works).
 
-Sign-in: tap Send code, type the 6-digit code in the app, tap Verify. Do not finish sign-in by tapping a link in Mail.
+Sign-in: Create account or Sign in with email and password in the app. You stay in the app. Do not finish sign-in by tapping a link in Mail.
 
 After Create household, walk through house setup (no Seed/sample week):
-1) Invite people — share https://<our-host>/join/<token> via share sheet (invite links only). Partner opens the link, then signs in with a code to their own email in the app.
+1) Invite people — share https://<our-host>/join/<token> via share sheet (invite links only). Partner opens the link, then creates their own account with their email and password, or signs in. There is no shared household password.
 2) How many people? — household size stepper.
 3) Which nights? — Sun–Sat toggles, all on by default. Easy off per day.
 4) Optional: adjust plates on On nights (guests / couple nights).

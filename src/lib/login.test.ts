@@ -3,107 +3,184 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { grokPromptPaste } from "./install-docs";
 import {
-  authCallbackRedirectPath,
-  legacyAuthCallbackUrl,
+  AUTH_ERROR_OFFLINE,
+  CREATE_ACCOUNT_CTA,
+  CREATE_ACCOUNT_HELPER,
+  CREATE_ACCOUNT_TITLE,
+  FORGOT_PASSWORD,
   LOGIN_CALLBACK_FAILED_COPY,
-  LOGIN_HELPER,
-  LOGIN_INTRO,
-  OTP_DIFFERENT,
-  OTP_ERROR_INVALID,
-  OTP_ERROR_OFFLINE,
-  OTP_ERROR_RATE_LIMIT,
-  OTP_ERROR_SEND_FAILED,
-  OTP_RESEND,
-  OTP_SEND,
-  OTP_TITLE,
-  OTP_VERIFY,
+  NEW_PASSWORD_SAVED_BODY,
+  PASSWORD_HINT,
+  PASSWORD_MISMATCH,
+  PASSWORD_TOO_SHORT,
+  RESET_BODY,
+  RESET_SEND,
+  RESET_SENT_HELPER,
+  RESET_SENT_TITLE,
+  RESET_TITLE,
+  SIGN_IN_CTA,
+  SIGN_IN_HELPER,
+  SIGN_IN_TITLE,
+  SIGNIN_ERROR_GENERIC,
+  SIGNIN_ERROR_MISMATCH,
+  SIGNIN_ERROR_RATE,
+  SIGNUP_ERROR_EXISTS,
+  SIGNUP_ERROR_GENERIC,
+  SIGNUP_ERROR_NO_SESSION,
+  SIGNUP_ERROR_RATE,
+  SIGNUP_ERROR_WEAK,
+  authCallbackRedirectPath,
+  clientPasswordBlock,
+  isRecoveryHash,
+  legacyAuthCallbackUrl,
   loginCallbackFailedMessage,
   loginCallbackFailedPath,
-  otpCodeFromInput,
-  otpFailureMessage,
-  otpOriginLine,
-  otpSentBody,
+  passwordAuthFailureMessage,
+  passwordMeetsMinimum,
+  passwordResetRedirectUrl,
+  resetSentBody,
   safeAuthNext,
+  signInOriginLine,
 } from "./login";
 
 const srcRoot = path.resolve(import.meta.dirname, "..");
 
-describe("email OTP sign-in copy", () => {
-  it("locks Send code and the in-app code screen", () => {
-    expect(LOGIN_INTRO).toBe("Sign in with a code we email you.");
-    expect(LOGIN_HELPER).toBe(
-      "We’ll email a 6-digit code. Enter it here — you can stay in this app.",
+describe("email and password sign-in copy", () => {
+  it("locks Create account, Sign in, and reset in the app", () => {
+    expect(CREATE_ACCOUNT_TITLE).toBe("Create your account");
+    expect(CREATE_ACCOUNT_HELPER).toBe("Use your own email. You’ll sign in on this phone.");
+    expect(CREATE_ACCOUNT_CTA).toBe("Create account");
+    expect(PASSWORD_HINT).toBe("At least 8 characters.");
+    expect(PASSWORD_TOO_SHORT).toBe("Use at least 8 characters.");
+    expect(PASSWORD_MISMATCH).toBe("Those passwords don’t match.");
+    expect(SIGN_IN_TITLE).toBe("Sign in");
+    expect(SIGN_IN_HELPER).toBe("Use the email and password for this phone’s app.");
+    expect(SIGN_IN_CTA).toBe("Sign in");
+    expect(FORGOT_PASSWORD).toBe("Forgot password?");
+    expect(RESET_TITLE).toBe("Reset password");
+    expect(RESET_BODY).toBe(
+      "We’ll email a reset link. After you set a new password, open Bot My Meals from your Home Screen and sign in.",
     );
-    expect(OTP_SEND).toBe("Send code");
-    expect(OTP_TITLE).toBe("Enter your code");
-    expect(otpSentBody("alex@example.com")).toBe("We sent a code to alex@example.com.");
-    expect(OTP_VERIFY).toBe("Verify");
-    expect(OTP_RESEND).toBe("Resend code");
-    expect(OTP_DIFFERENT).toBe("Use a different email");
-    expect(otpOriginLine("https://bot-my-meals.example.workers.dev")).toBe(
-      "This code signs you in on https://bot-my-meals.example.workers.dev.",
+    expect(RESET_SEND).toBe("Send reset link");
+    expect(RESET_SENT_TITLE).toBe("Check your email");
+    expect(resetSentBody("alex@example.com")).toBe(
+      "If an account exists for alex@example.com, we sent a reset link. Set the new password, then open this app from your Home Screen and sign in.",
     );
-    expect(otpCodeFromInput("12-34 56")).toBe("123456");
-    expect(otpCodeFromInput("12345678")).toBe("123456");
+    expect(RESET_SENT_HELPER).toBe(
+      "Prefer asking your household partner for a new invite if you can’t get into email.",
+    );
+    expect(NEW_PASSWORD_SAVED_BODY).toBe(
+      "Open Bot My Meals from your Home Screen and sign in with your new password.",
+    );
+    expect(signInOriginLine("https://bot-my-meals.example.workers.dev")).toBe(
+      "You’re signing in on https://bot-my-meals.example.workers.dev.",
+    );
+    expect(passwordMeetsMinimum("12345678")).toBe(true);
+    expect(passwordMeetsMinimum("1234567")).toBe(false);
+    expect(clientPasswordBlock("short", "short")).toBe(PASSWORD_TOO_SHORT);
+    expect(clientPasswordBlock("longenough", "different")).toBe(PASSWORD_MISMATCH);
+    expect(clientPasswordBlock("longenough", "longenough")).toBeNull();
+    expect(clientPasswordBlock("longenough")).toBeNull();
+    expect(isRecoveryHash("#access_token=a&refresh_token=b&type=recovery")).toBe(true);
+    expect(isRecoveryHash("#access_token=a&refresh_token=b&type=magiclink")).toBe(false);
+    expect(passwordResetRedirectUrl("https://bot-my-meals.example.workers.dev/")).toBe(
+      "https://bot-my-meals.example.workers.dev/login/new-password",
+    );
 
     const login = readFileSync(path.join(srcRoot, "components/login-home.tsx"), "utf8");
-    const form = readFileSync(path.join(srcRoot, "components/email-otp-form.tsx"), "utf8");
+    const form = readFileSync(path.join(srcRoot, "components/password-auth-form.tsx"), "utf8");
     const provider = readFileSync(path.join(srcRoot, "components/supper-provider.tsx"), "utf8");
+    const updated = readFileSync(path.join(srcRoot, "components/new-password-form.tsx"), "utf8");
 
     expect(login).toContain("BrandMark");
-    expect(login).toContain("EmailOtpForm");
+    expect(login).toContain("PasswordAuthForm");
     expect(login).not.toContain("Email me a sign-in link");
     expect(login).not.toContain("CheckEmailCard");
     expect(login).not.toMatch(/Safari/);
     expect(login).not.toMatch(/grandma/i);
-    expect(form).toContain("OTP_SEND");
-    expect(form).toContain("OTP_VERIFY");
-    expect(form).toContain("OTP_TITLE");
+    expect(form).toContain("CREATE_ACCOUNT_TITLE");
+    expect(form).toContain("SIGN_IN_TITLE");
+    expect(form).toContain("RESET_TITLE");
+    expect(form).toContain("RESET_SENT_TITLE");
     expect(form).toContain('aria-label="Email address"');
-    expect(form).toContain('aria-label="6-digit code"');
-    expect(form).toContain('inputMode="numeric"');
-    expect(form).toContain('autoComplete="one-time-code"');
-    expect(form).toContain("verifyEmailOtp");
+    expect(form).toContain('screen === "sign-in" ? "username" : "email"');
+    expect(form).toContain('autoComplete="new-password"');
+    expect(form).toContain('autoComplete="current-password"');
+    expect(form).toContain("signUpWithPassword");
+    expect(form).toContain("signInWithPassword");
+    expect(form).toContain("requestPasswordReset");
+    expect(form).toContain("Home Screen");
     expect(form).toContain('variant="ghost"');
     expect(form).not.toContain("Email me a sign-in link");
-    expect(form).not.toMatch(/Safari/);
-    expect(form).not.toMatch(/grandma/i);
-    expect(form).not.toContain("Link sent");
-    expect(provider).toContain("signInWithOtp");
-    expect(provider).toContain('type: "email"');
-    expect(provider).toContain("verifyOtp");
+    expect(form).not.toContain("Sign in with a code");
+    expect(form).not.toMatch(/Safari|Gmail|grandma|Apple|Google/i);
+    expect(provider).toContain("signUp");
+    expect(provider).toContain("signInWithPassword");
+    expect(provider).toContain("resetPasswordForEmail");
+    expect(provider).toContain('flowType: "implicit"');
+    expect(provider).not.toContain("signInWithOtp");
     expect(provider).not.toContain("signInMagicLink");
     expect(provider).not.toContain("localStorage");
+    expect(updated).toContain("setSession");
+    expect(updated).toContain("updatePassword");
+    expect(updated).toContain("NEW_PASSWORD_SAVED_BODY");
+    expect(updated).not.toMatch(/Safari|grandma/i);
   });
 
   it("maps failures to one short line", () => {
-    expect(OTP_ERROR_INVALID).toBe("That code didn’t work. Try again or resend.");
-    expect(OTP_ERROR_RATE_LIMIT).toBe("Wait a minute, then resend.");
-    expect(OTP_ERROR_SEND_FAILED).toBe("Couldn’t send a code. Check the email and try again.");
-    expect(OTP_ERROR_OFFLINE).toBe("You’re offline. Try again when you’re back.");
-
-    expect(otpFailureMessage("verify", { message: "Token has expired or is invalid" })).toBe(
-      OTP_ERROR_INVALID,
+    expect(SIGNUP_ERROR_EXISTS).toBe(
+      "That email already has an account. Sign in, or reset your password.",
     );
-    expect(otpFailureMessage("send", { status: 429, message: "Email rate limit exceeded" })).toBe(
-      OTP_ERROR_RATE_LIMIT,
+    expect(SIGNUP_ERROR_WEAK).toBe("Choose a different password and try again.");
+    expect(SIGNUP_ERROR_RATE).toBe("Too many tries. Wait a minute and try again.");
+    expect(AUTH_ERROR_OFFLINE).toBe("You’re offline. Try again when you’re back.");
+    expect(SIGNUP_ERROR_GENERIC).toBe("Couldn’t create the account. Try again.");
+    expect(SIGNIN_ERROR_MISMATCH).toBe("Email or password doesn’t match.");
+    expect(SIGNIN_ERROR_RATE).toBe("Too many tries. Wait a bit, or reset your password.");
+    expect(SIGNIN_ERROR_GENERIC).toBe("Sign-in didn’t finish. Try again.");
+
+    expect(passwordAuthFailureMessage("signup", { message: "User already registered" })).toBe(
+      SIGNUP_ERROR_EXISTS,
+    );
+    expect(passwordAuthFailureMessage("signup", new Error("user_already_exists"))).toBe(
+      SIGNUP_ERROR_EXISTS,
+    );
+    expect(passwordAuthFailureMessage("signup", new Error("signup_no_session"))).toBe(
+      SIGNUP_ERROR_NO_SESSION,
+    );
+    expect(passwordAuthFailureMessage("signup", new Error("password_too_short"))).toBe(
+      PASSWORD_TOO_SHORT,
     );
     expect(
-      otpFailureMessage("send", { code: "over_email_send_rate_limit", message: "slow down" }),
-    ).toBe(OTP_ERROR_RATE_LIMIT);
-    expect(otpFailureMessage("send", new TypeError("Failed to fetch"))).toBe(OTP_ERROR_OFFLINE);
-    expect(otpFailureMessage("send", new Error("boom"), false)).toBe(OTP_ERROR_OFFLINE);
-    expect(otpFailureMessage("send", { message: "Unable to validate email address" })).toBe(
-      OTP_ERROR_SEND_FAILED,
+      passwordAuthFailureMessage("signup", { code: "weak_password", message: "Password is known" }),
+    ).toBe(SIGNUP_ERROR_WEAK);
+    expect(passwordAuthFailureMessage("signup", { status: 429, message: "too many requests" })).toBe(
+      SIGNUP_ERROR_RATE,
     );
-    expect(otpFailureMessage("send", { message: "Token has expired or is invalid" })).not.toMatch(
+    expect(passwordAuthFailureMessage("signin", { message: "Invalid login credentials" })).toBe(
+      SIGNIN_ERROR_MISMATCH,
+    );
+    expect(passwordAuthFailureMessage("signin", { status: 429, message: "Request rate limit" })).toBe(
+      SIGNIN_ERROR_RATE,
+    );
+    expect(passwordAuthFailureMessage("signin", new TypeError("Failed to fetch"))).toBe(
+      AUTH_ERROR_OFFLINE,
+    );
+    expect(passwordAuthFailureMessage("signup", new Error("boom"), false)).toBe(AUTH_ERROR_OFFLINE);
+    expect(passwordAuthFailureMessage("reset", { message: "Unable to send" })).toBe(
+      "Couldn’t send the reset link. Try again.",
+    );
+    expect(passwordAuthFailureMessage("signin", { message: "Token has expired or is invalid" })).not.toMatch(
       /Safari|Gmail|grandma/i,
+    );
+    expect(passwordAuthFailureMessage("update", { code: "weak_password", message: "no" })).toBe(
+      SIGNUP_ERROR_WEAK,
     );
   });
 });
 
 describe("auth callback failure surface", () => {
-  it("sends a failed or missing exchange to the code form", () => {
+  it("sends a failed or missing exchange back to sign in", () => {
     expect(loginCallbackFailedPath()).toBe("/login?error=auth");
     expect(
       authCallbackRedirectPath({
@@ -157,7 +234,7 @@ describe("auth callback failure surface", () => {
 
   it("shows a short reason on /login for ?error=auth", () => {
     expect(LOGIN_CALLBACK_FAILED_COPY).toBe(
-      "Sign-in didn’t finish. Send a new code on this phone.",
+      "That link didn’t finish. Sign in, or request a new reset.",
     );
     expect(LOGIN_CALLBACK_FAILED_COPY).not.toMatch(/Safari|Gmail|grandma/i);
     expect(loginCallbackFailedMessage("auth")).toBe(LOGIN_CALLBACK_FAILED_COPY);
@@ -167,7 +244,7 @@ describe("auth callback failure surface", () => {
 
     const loginPage = readFileSync(path.join(srcRoot, "app/login/page.tsx"), "utf8");
     const loginHome = readFileSync(path.join(srcRoot, "components/login-home.tsx"), "utf8");
-    const form = readFileSync(path.join(srcRoot, "components/email-otp-form.tsx"), "utf8");
+    const form = readFileSync(path.join(srcRoot, "components/password-auth-form.tsx"), "utf8");
     const callback = readFileSync(path.join(srcRoot, "app/auth/callback/route.ts"), "utf8");
     const client = readFileSync(path.join(srcRoot, "lib/supabase/client.ts"), "utf8");
 
@@ -181,32 +258,43 @@ describe("auth callback failure surface", () => {
     expect(callback).not.toMatch(/await supabase\.auth\.exchangeCodeForSession\(code\);\s*\}/);
     expect(client).toContain("createBrowserClient");
     expect(client).toContain("supabaseAuthCookieOptions");
+    expect(client).toContain("detectSessionInUrl: false");
     expect(client).not.toContain("localStorage");
   });
 });
 
-describe("install paste for OTP", () => {
-  it("documents SMTP and {{ .Token }} and does not teach a mail-link happy path", () => {
+describe("install paste for email and password", () => {
+  it("documents Confirm email OFF and does not require SMTP", () => {
     const readme = readFileSync(path.join(srcRoot, "../README.md"), "utf8");
     const domains = readFileSync(path.join(srcRoot, "../docs/domains.md"), "utf8");
     const paste = grokPromptPaste(readme);
     for (const doc of [readme, domains, paste]) {
+      expect(doc).toMatch(/Confirm email OFF/);
+      expect(doc).toMatch(/email \+ password/);
+      expect(doc).toMatch(/Create account/);
+      expect(doc).toMatch(/not a magic link/);
+      expect(doc).toMatch(/Optional later: custom SMTP/);
       expect(doc).toMatch(/\{\{ \.Token \}\}/);
-      expect(doc).toMatch(/custom SMTP/);
-      expect(doc).toMatch(/Send code/);
-      expect(doc).toMatch(/Verify/);
+      expect(doc).not.toMatch(/Email OTP/);
+      expect(doc).not.toMatch(/Send code/);
+      expect(doc).not.toMatch(/Add custom SMTP/);
       expect(doc).not.toMatch(/Email me a sign-in link/);
       expect(doc).not.toMatch(/Enable Email magic link/);
       expect(doc).not.toMatch(/Gmail’s in-app browser/);
       expect(doc).not.toMatch(/grandma/i);
+      expect(doc).not.toMatch(/email verified/i);
     }
-    expect(readme).toMatch(/Email OTP/);
     expect(readme).toMatch(/auth\/callback/);
+    expect(readme).toMatch(/login\/new-password/);
     expect(readme).toContain('id="grok-prompt"');
-    expect(domains).toMatch(/Email OTP/);
     expect(domains).toMatch(/Site URL/);
-    expect(paste).toMatch(/Email OTP/);
-    expect(paste).toMatch(/not magic-link-only/);
+    expect(domains).toMatch(/no shared household password/i);
+    expect(paste).toMatch(/auth\/callback/);
+    expect(paste).toMatch(/Site URL/);
+    expect(paste).toMatch(/Do not turn on Apple or Google for Install/);
+    expect(paste).toMatch(/Passkeys later/);
+    expect(paste).toMatch(/no shared household password/i);
+    expect(paste).not.toMatch(/Optional later: passwords/);
     expect(paste).toMatch(/easy for anyone/);
     expect(paste).toMatch(/cart adds only where the store actually supports them/);
     expect(paste).toMatch(/Do NOT invent prices/);

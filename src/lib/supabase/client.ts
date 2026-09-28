@@ -10,5 +10,9 @@ export function createSupabaseBrowserClient() {
   );
   return createBrowserClient(config.url, config.anonKey, {
     cookieOptions: supabaseAuthCookieOptions(secure),
+    auth: {
+      // Recovery links are adopted on /login/new-password. Don't consume them here.
+      detectSessionInUrl: false,
+    },
   });
 }

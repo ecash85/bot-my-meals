@@ -3,8 +3,9 @@ import type { CookieOptionsWithName } from "@supabase/ssr";
 /**
  * Session cookies for @supabase/ssr. Not localStorage.
  * SameSite=Lax and Secure on HTTPS.
- * httpOnly stays false: the installed PWA reads this cookie from the browser
- * client, and document.cookie cannot set HttpOnly. That matches @supabase/ssr.
+ * httpOnly stays false: Create account and Sign in write the session from the
+ * browser client, and document.cookie cannot set HttpOnly. Server refresh uses
+ * the same options so the installed app can still read the session.
  */
 export function supabaseAuthCookieOptions(secure: boolean): CookieOptionsWithName {
   return {

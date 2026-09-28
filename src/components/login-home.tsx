@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BackendSetupGate } from "@/components/backend-setup-gate";
 import { BrandMark } from "@/components/brand-mark";
-import { EmailOtpForm } from "@/components/email-otp-form";
+import { PasswordAuthForm } from "@/components/password-auth-form";
 import { useSupper } from "@/components/supper-provider";
+import { isRecoveryHash } from "@/lib/login";
 
 export function LoginHome({
   callbackError = null,
@@ -18,6 +19,10 @@ export function LoginHome({
   const headingToWeek = ready && Boolean(session);
 
   useEffect(() => {
+    if (isRecoveryHash(window.location.hash)) {
+      window.location.replace(`/login/new-password${window.location.hash}`);
+      return;
+    }
     if (headingToWeek) router.replace("/week");
   }, [headingToWeek, router]);
 
@@ -38,7 +43,7 @@ export function LoginHome({
       {showForm ? (
         <div className="mt-10 animate-in fade-in duration-300 ease-out">
           <div className="rounded-[14px] bg-card p-5 shadow-card">
-            <EmailOtpForm callbackError={callbackError} />
+            <PasswordAuthForm callbackError={callbackError} />
           </div>
         </div>
       ) : null}

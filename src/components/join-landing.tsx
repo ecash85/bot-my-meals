@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Utensils } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { BackendSetupGate } from "@/components/backend-setup-gate";
-import { EmailOtpForm } from "@/components/email-otp-form";
+import { PasswordAuthForm } from "@/components/password-auth-form";
 import { HouseCard } from "@/components/house-card";
 import { useSupper } from "@/components/supper-provider";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import {
   JOIN_TITLE,
   isJoinTokenFormat,
   joinInviteBody,
-  joinPath,
   joinTokenReason,
 } from "@/lib/join";
 
@@ -153,7 +152,7 @@ export function JoinLanding({ token }: { token: string }) {
               <p className="type-body mt-4 text-muted-foreground">{joinInviteBody(houseName)}</p>
               <p className="type-meta mt-3 text-muted-foreground">{JOIN_HELPER}</p>
             </div>
-            <EmailOtpForm next={joinPath(token)} showIntro={false} />
+            <PasswordAuthForm initialMode="create" />
           </div>
         )}
         {error ? (

@@ -18,11 +18,15 @@ describe("Workers Builds deploy docs", () => {
     const readme = readRepo("README.md");
 
     expect(readme).not.toMatch(/grandma/i);
-    expect(readme).toMatch(/Email OTP/);
-    expect(readme).toMatch(/Send code/);
-    expect(readme).toMatch(/Verify/);
+    expect(readme).toMatch(/Confirm email OFF/);
+    expect(readme).toMatch(/email \+ password/);
+    expect(readme).toMatch(/Create account/);
+    expect(readme).toMatch(/not a magic link/);
     expect(readme).toMatch(/\{\{ \.Token \}\}/);
-    expect(readme).toMatch(/custom SMTP/);
+    expect(readme).toMatch(/Optional later: custom SMTP/);
+    expect(readme).not.toMatch(/Email OTP/);
+    expect(readme).not.toMatch(/Send code/);
+    expect(readme).not.toMatch(/Add custom SMTP/);
     expect(readme).not.toMatch(/Email me a sign-in link/);
     expect(readme).not.toMatch(/Enable Email magic link/);
     expect(readme).not.toMatch(/Gmail’s in-app browser/);

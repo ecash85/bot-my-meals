@@ -107,12 +107,12 @@ describe("join landing and House invite surfaces", () => {
     expect(landing).toContain("hideNav");
     expect(landing).toContain("JOIN_TITLE");
     expect(landing).toContain("JOIN_CTA");
-    expect(landing).toContain("EmailOtpForm");
-    expect(landing).toContain("showIntro={false}");
+    expect(landing).toContain("PasswordAuthForm");
+    expect(landing).toContain('initialMode="create"');
     expect(landing).not.toContain("CheckEmailCard");
     expect(landing).not.toContain("Email me a sign-in link");
     expect(landing).not.toContain("LOGIN_SAME_DEVICE");
-    expect(landing).toContain("joinPath(token)");
+    expect(landing).not.toMatch(/household password/i);
     expect(landing).toContain("claimJoinToken");
     expect(landing).toContain("Ask your partner to share a new invite link");
     expect(landing).not.toContain("Join with code");
@@ -129,10 +129,10 @@ describe("join landing and House invite surfaces", () => {
 
     expect(house).toContain("InviteShare");
     expect(house).toContain("createJoinToken");
-    expect(provider).toContain("signInWithOtp");
-    expect(provider).toContain("verifyOtp");
-    expect(provider).toContain('type: "email"');
-    expect(provider).toContain("emailRedirectTo");
-    expect(provider).toContain("legacyAuthCallbackUrl");
+    expect(provider).toContain("signUp");
+    expect(provider).toContain("signInWithPassword");
+    expect(provider).toContain("resetPasswordForEmail");
+    expect(provider).not.toContain("signInWithOtp");
+    expect(provider).toContain("passwordResetRedirectUrl");
   });
 });
