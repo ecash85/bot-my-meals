@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useState, type CSSProperties, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -12,8 +12,9 @@ import { BallotToast } from "@/components/ballot-toast";
 import { EmptyDayCard } from "@/components/empty-day-card";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
-import { LockedNightFrame, PostLockWaitingSheet } from "@/components/post-lock-waiting";
-import { WeekStrip } from "@/components/week-strip";
+import { LockedNightFrame, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
+import { UnlockWeekControl } from "@/components/unlock-week-control";
+import { WeekChrome } from "@/components/week-chrome";
 import { Onboarding } from "@/components/onboarding";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useSupper } from "@/components/supper-provider";
@@ -29,12 +30,19 @@ import {
   type WeekNightPresentation,
 } from "@/lib/ballot";
 import { botCheckForSnapshot } from "@/lib/bot-check";
-import { formatMealCardDayLabel, formatWeekRange, toISODate, weekdayLabelFromNight } from "@/lib/dates";
-import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
+import { formatMealCardDayLabel, formatWeekRange, weekdayLabelFromNight } from "@/lib/dates";
+import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import { focusNightCard, nightCardAnchorId } from "@/lib/week-strip";
 import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
 import { isPendingBotFill, lockedDinnerTap } from "@/lib/post-lock-waiting";
 import { recipeNightsForWeek } from "@/lib/recipes";
+import {
+  nightStaysLocked,
+  showFirstMealRow,
+  showOpenShoppingList,
+  stripCellMuted,
+  upcomingDinner,
+} from "@/lib/week-chrome";
 import type { Meal, NightLifecycle, VoteChoice } from "@/lib/types";
 
 export default function WeekPage() {
@@ -64,6 +72,8 @@ function WeekBallot() {
   const [toast, setToast] = useState<string | undefined>();
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
+  const [chromeH, setChromeH] = useState(0);
+  const onChromeHeight = useCallback((height: number) => setChromeH(height), []);
   const dismissToast = useCallback(() => setToast(undefined), []);
   const jumpToNight = useCallback((mealId: string) => {
     setSelectedNightId(mealId);
@@ -72,6 +82,7 @@ function WeekBallot() {
   if (!snapshot) return null;
 
   const locked = snapshot.week.status === "locked";
+  const todayIso = todayInTimeZone(new Date(), snapshot.household.timezone);
   const pendingFill = isPendingBotFill({
     weekStatus: snapshot.week.status,
     meals: snapshot.meals,
@@ -82,8 +93,25 @@ function WeekBallot() {
   });
   const botCheck = botCheckForSnapshot(snapshot);
   const check = checkWeekLock(snapshot.meals, snapshot.votes, snapshot.memberships);
-  const canVote = Boolean(session?.membershipId) && canActOnBallot(session?.role) && !locked;
   const nights = recipeNightsForWeek(snapshot.meals);
+  const dinner = upcomingDinner(snapshot.meals, snapshot.votes, todayIso);
+  const firstMeal =
+    showFirstMealRow({ weekStatus: snapshot.week.status, pendingFill, meal: dinner }) && dinner
+      ? {
+          id: dinner.id,
+          title: dinner.title,
+          weekday: weekdayLabelFromNight(dinner.nightDate),
+        }
+      : null;
+  const mutedDates = nights
+    .filter((meal) =>
+      stripCellMuted({
+        weekStatus: snapshot.week.status,
+        nightDate: meal.nightDate,
+        editableFrom: snapshot.week.editableFrom,
+      }),
+    )
+    .map((meal) => meal.nightDate);
 
   const act = async (mealId: string, choice: VoteChoice, note?: string) => {
     try {
@@ -98,22 +126,43 @@ function WeekBallot() {
     <AppShell
       title="This week"
       eyebrow={formatWeekRange(snapshot.week.startsOn)}
+      titleAside={locked ? <UnlockWeekControl variant="inline" /> : undefined}
       status={undefined}
       footer={!locked && check.ready ? <LockBar /> : undefined}
     >
       <InstallPrompt />
-      {locked ? <div className="mb-4"><LockBar /></div> : null}
       {nights.length === 0 ? (
         <EmptyWeek onCreateMeals={() => requestWeekBallot()} />
       ) : (
-        <div className="space-y-3">
-          <WeekStrip
+        <div
+          className="space-y-3"
+          style={{ "--week-chrome-h": `${chromeH}px` } as CSSProperties}
+        >
+          {pendingFill ? (
+            <div data-slot="week-pending-fill" data-state="pending" className="mb-4">
+              <PostLockWaitingCard
+                mode={snapshot.household.botCheckMode}
+                intervalHours={snapshot.household.botCheckIntervalHours}
+              />
+            </div>
+          ) : null}
+          <WeekChrome
             nights={nights}
             selectedMealId={
-              selectedNightId ?? nights.find((meal) => meal.nightDate === toISODate(new Date()))?.id ?? null
+              selectedNightId ?? nights.find((meal) => meal.nightDate === todayIso)?.id ?? null
             }
+            todayIso={todayIso}
             locked={locked}
+            mutedDates={mutedDates}
+            showShoppingList={showOpenShoppingList({
+              weekStatus: snapshot.week.status,
+              shoppingPrompt: snapshot.week.shoppingPrompt,
+              pendingFill,
+              items: snapshot.shoppingList?.items ?? null,
+            })}
+            firstMeal={firstMeal}
             onSelect={jumpToNight}
+            onHeight={onChromeHeight}
           />
           <WaitingBotCheck status={botCheck} pendingWorkOnly className="mb-1" />
           {nights.map((meal) => {
@@ -121,7 +170,14 @@ function WeekBallot() {
             const dayName = weekdayLabelFromNight(meal.nightDate);
             const latest = latestVoteForMeal(snapshot.votes, meal.id, snapshot.memberships);
             const lifecycle = nightLifecycle(meal, snapshot.votes, snapshot.memberships);
-            const presentation = weekNightPresentation(lifecycle, locked);
+            const nightLocked = nightStaysLocked({
+              weekStatus: snapshot.week.status,
+              nightDate: meal.nightDate,
+              editableFrom: snapshot.week.editableFrom,
+            });
+            const canVote =
+              Boolean(session?.membershipId) && canActOnBallot(session?.role) && !nightLocked;
+            const presentation = weekNightPresentation(lifecycle, nightLocked);
 
             return (
               <div
@@ -129,7 +185,7 @@ function WeekBallot() {
                 id={nightCardAnchorId(meal.id)}
                 tabIndex={-1}
                 data-slot="night-card-anchor"
-                className="scroll-mt-[calc(var(--shell-head-h)+4.75rem)] rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
+                className="scroll-mt-[calc(var(--shell-head-h)+var(--week-chrome-h,0px)+0.25rem)] rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
               >
                 {renderNightCard({
                   presentation,
@@ -138,7 +194,7 @@ function WeekBallot() {
                   meal,
                   latestNote: latest?.note,
                   canVote,
-                  locked,
+                  locked: nightLocked,
                   pending: pendingFill,
                   lifecycle,
                   onAct: act,

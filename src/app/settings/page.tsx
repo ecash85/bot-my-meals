@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { ChevronRight } from "lucide-react";
 import { AppearancePicker } from "@/components/appearance-picker";
 import { BotCheckFrequency } from "@/components/bot-check-frequency";
@@ -43,7 +44,6 @@ function SettingsBody() {
     updateHousehold,
     addStore,
     removeStore,
-    unlockWeek,
     createJoinToken,
   } = useSupper();
   const router = useRouter();
@@ -52,7 +52,6 @@ function SettingsBody() {
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const [budgetBusy, setBudgetBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
   const triedJoinToken = useRef(false);
   const budget =
     budgetDraft ?? formatWeeklyBudgetDollars(snapshot?.household.weeklyBudgetCents);
@@ -214,22 +213,8 @@ function SettingsBody() {
       />
 
       {owner && snapshot.week.status === "locked" ? (
-        <section className="mt-6 space-y-2">
-          <Button
-            variant="outline"
-            size="fat"
-            className="w-full"
-            disabled={unlocking}
-            aria-busy={unlocking}
-            onClick={() => {
-              setUnlocking(true);
-              void unlockWeek()
-                .catch(() => undefined)
-                .finally(() => setUnlocking(false));
-            }}
-          >
-            {unlocking ? "Unlocking…" : "Unlock this week"}
-          </Button>
+        <section className="mt-6">
+          <UnlockWeekControl variant="block" />
         </section>
       ) : null}
 

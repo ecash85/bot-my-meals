@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { ListRow } from "@/components/list-row";
@@ -7,10 +9,13 @@ import { LockFirstEmpty } from "@/components/lock-first-empty";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
+import { Button } from "@/components/ui/button";
 import { useOptimisticValue } from "@/components/use-optimistic-value";
 import { formatWeekEyebrow } from "@/lib/dates";
 import { isNightOff } from "@/lib/lock";
 import {
+  DISMISS_SHOPPING_LABEL,
+  DONE_SHOPPING_LABEL,
   LIST_LOCKED_SECONDARY,
   LIST_NO_HOUSEHOLD,
   LIST_NOTHING_TO_BUY,
@@ -30,7 +35,8 @@ export default function ListPage() {
 }
 
 function ListBody() {
-  const { snapshot, toggleItem } = useSupper();
+  const { snapshot, toggleItem, closeShoppingPrompt } = useSupper();
+  const [pendingClose, setPendingClose] = useState<"done" | "dismissed" | null>(null);
   if (!snapshot) {
     return (
       <AppShell title="Shopping list">
@@ -126,6 +132,46 @@ function ListBody() {
           </section>
         ))}
       </div>
+      {snapshot.week.shoppingPrompt === "open" || pendingClose ? (
+        <div data-slot="shopping-prompt-actions" className="mt-8 space-y-2">
+          <Button
+            type="button"
+            size="fat"
+            variant="primary"
+            className="w-full"
+            data-slot="done-shopping"
+            disabled={pendingClose !== null}
+            aria-busy={pendingClose === "done"}
+            onClick={() => {
+              setPendingClose("done");
+              void closeShoppingPrompt("done")
+                .catch(() => undefined)
+                .finally(() => setPendingClose(null));
+            }}
+          >
+            {pendingClose === "done" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : null}
+            {pendingClose === "done" ? "Saving…" : DONE_SHOPPING_LABEL}
+          </Button>
+          <Button
+            type="button"
+            size="fat"
+            variant="ghost"
+            className="w-full"
+            data-slot="dismiss-shopping"
+            disabled={pendingClose !== null}
+            aria-busy={pendingClose === "dismissed"}
+            onClick={() => {
+              setPendingClose("dismissed");
+              void closeShoppingPrompt("dismissed")
+                .catch(() => undefined)
+                .finally(() => setPendingClose(null));
+            }}
+          >
+            {pendingClose === "dismissed" ? <Loader2 className="size-5 animate-spin" aria-hidden /> : null}
+            {DISMISS_SHOPPING_LABEL}
+          </Button>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

@@ -9,6 +9,7 @@ import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
 import { formatWeekEyebrow, weekdayShortFromNight } from "@/lib/dates";
+import { todayInTimeZone } from "@/lib/meal-history";
 import { isNightOff } from "@/lib/lock";
 import {
   LOCK_FIRST_TITLE,
@@ -51,7 +52,8 @@ function RecipesBody() {
   const removedMealIds = new Set(
     nights.filter((meal) => isNightOff(meal.id, snapshot.votes)).map((meal) => meal.id),
   );
-  const firstMeal = firstCookableMeal(nights, snapshot.votes);
+  const todayIso = todayInTimeZone(new Date(), snapshot.household.timezone);
+  const firstMeal = firstCookableMeal(nights, snapshot.votes, todayIso);
 
   if (!locked) {
     return (

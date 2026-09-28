@@ -44,6 +44,7 @@ import {
 } from "@/lib/headcount";
 import { parseMealHistory } from "@/lib/meal-history";
 import { redactUntilLocked } from "@/lib/visibility";
+import { parseEditableFrom, parseShoppingPrompt } from "@/lib/week-chrome";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function mapBallotRequest(
@@ -243,6 +244,8 @@ export async function fetchSupabaseSnapshot(
     startsOn: weekRow.starts_on,
     status: weekRow.status,
     lockedAt: weekRow.locked_at,
+    editableFrom: parseEditableFrom(weekRow.editable_from),
+    shoppingPrompt: parseShoppingPrompt(weekRow.shopping_prompt),
   };
 
   let shoppingList: ShoppingList | null = null;
@@ -456,14 +459,31 @@ export async function supabaseLockWeek(client: SupabaseClient) {
   if (error) throw new Error(error.message);
 }
 
-export async function supabaseUnlockWeek(client: SupabaseClient, session: Session, weekId: string) {
+export async function supabaseUnlockWeek(
+  client: SupabaseClient,
+  session: Session,
+  weekId: string,
+  editableFrom: string,
+) {
   if (session.role !== "owner") throw new Error("Only an Admin can unlock the week.");
   const { error } = await client
     .from("weeks")
-    .update({ status: "voting", locked_at: null })
+    .update({ status: "voting", locked_at: null, editable_from: editableFrom })
     .eq("id", weekId);
   if (error) throw new Error(error.message);
   await client.from("shopping_lists").delete().eq("week_id", weekId);
+}
+
+export async function supabaseSetShoppingPrompt(
+  client: SupabaseClient,
+  weekId: string,
+  shoppingPrompt: Week["shoppingPrompt"],
+) {
+  const { error } = await client
+    .from("weeks")
+    .update({ shopping_prompt: shoppingPrompt })
+    .eq("id", weekId);
+  if (error) throw new Error(error.message);
 }
 
 export async function supabaseToggleItem(

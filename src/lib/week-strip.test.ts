@@ -55,10 +55,11 @@ describe("This week strip", () => {
   it("sits under the header, jumps inside the list, and leaves card actions in place", () => {
     const root = path.resolve(import.meta.dirname, "..");
     const week = readFileSync(path.join(root, "app/week/page.tsx"), "utf8");
+    const chrome = readFileSync(path.join(root, "components/week-chrome.tsx"), "utf8");
     const strip = readFileSync(path.join(root, "components/week-strip.tsx"), "utf8");
     const card = readFileSync(path.join(root, "components/ballot-card.tsx"), "utf8");
 
-    expect(week).toContain("<WeekStrip");
+    expect(week).toContain("<WeekChrome");
     expect(week).toContain("focusNightCard");
     expect(week).toContain("nightCardAnchorId");
     expect(week).toContain("<BallotCard");
@@ -66,12 +67,20 @@ describe("This week strip", () => {
     expect(week).toContain("<LockBar");
     expect(week).not.toContain("Calendar");
     expect(week).not.toContain("month-grid");
+    expect(chrome).toContain("<WeekStrip");
+    expect(chrome).toContain("top-[calc(var(--shell-head-h)-1px)]");
+    expect(chrome).toContain("bg-background ");
+    expect(chrome).not.toContain("bg-background/95");
+    expect(chrome).not.toContain("backdrop-blur");
     expect(strip).toContain('data-slot="week-strip"');
-    expect(strip).toContain("top-[calc(var(--shell-head-h)-1px)]");
-    expect(strip).toContain("bg-background ");
-    expect(strip).not.toContain("bg-background/95");
-    expect(strip).not.toContain("backdrop-blur");
+    expect(strip).toContain("min-h-[44px]");
+    expect(strip).toContain("min-w-[44px]");
+    expect(strip).toContain("gap-2");
+    expect(strip).toContain("py-3");
+    expect(strip).toContain("flex-1");
     expect(strip).toContain('type="button"');
+    expect(strip).not.toContain("<Lock");
+    expect(strip).not.toContain("lucide-react");
     expect(strip).not.toContain("href=");
     expect(strip).not.toContain("Calendar");
     expect(card).toMatch(/>\s*Swap\s*</);

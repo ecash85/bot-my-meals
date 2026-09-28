@@ -17,6 +17,10 @@ export type NightLifecycle = (typeof NIGHT_LIFECYCLES)[number];
 export type Audience = "couple" | "family";
 export type WeekStatus = "voting" | "locked";
 
+/** This week shopping row. `done` and `dismissed` keep it hidden after a re-lock. */
+export const SHOPPING_PROMPTS = ["open", "done", "dismissed"] as const;
+export type ShoppingPrompt = (typeof SHOPPING_PROMPTS)[number];
+
 export const BOT_CHECK_MODES = ["adaptive", "fixed"] as const;
 export type BotCheckMode = (typeof BOT_CHECK_MODES)[number];
 
@@ -139,6 +143,9 @@ export type Week = {
   startsOn: string;
   status: WeekStatus;
   lockedAt: string | null;
+  /** House-local date of a mid-week unlock. Nights before this stay read-only. */
+  editableFrom: string | null;
+  shoppingPrompt: ShoppingPrompt;
 };
 
 /** Title-only dinner kept after a week finishes. No recipe payload. */

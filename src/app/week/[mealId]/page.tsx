@@ -15,6 +15,7 @@ import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
 import { RECIPE_PENDING_BACK, nightShowsRecipePending } from "@/lib/post-lock-waiting";
+import { nightStaysLocked } from "@/lib/week-chrome";
 import type { VoteChoice } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +39,16 @@ function MealDetail({ mealId }: { mealId: string }) {
     meal && snapshot
       ? latestVoteForMeal(snapshot.votes, meal.id, snapshot.memberships)
       : undefined;
-  const locked = snapshot?.week.status === "locked";
+  const weekLocked = snapshot?.week.status === "locked";
+  const pastLocked =
+    snapshot && meal
+      ? nightStaysLocked({
+          weekStatus: snapshot.week.status,
+          nightDate: meal.nightDate,
+          editableFrom: snapshot.week.editableFrom,
+        }) && !weekLocked
+      : false;
+  const readOnly = weekLocked || pastLocked;
 
   const leftoverSources = useMemo(
     () => (snapshot && meal ? snapshot.meals.filter((item) => item.dayIndex < meal.dayIndex && !item.isLeftovers) : []),
@@ -66,7 +76,7 @@ function MealDetail({ mealId }: { mealId: string }) {
     mealId: meal.id,
   });
   const voters = votingMembers(snapshot.memberships);
-  const canAct = canActOnBallot(session?.role) && !locked;
+  const canAct = canActOnBallot(session?.role) && !readOnly;
 
   const choose = (choice: VoteChoice) => {
     void setVote(meal.id, choice, note).catch(() => undefined);
@@ -81,12 +91,12 @@ function MealDetail({ mealId }: { mealId: string }) {
 
   return (
     <AppShell
-      title={skipped && locked ? EMPTY_DAY_TITLE : meal.title}
+      title={skipped && readOnly ? EMPTY_DAY_TITLE : meal.title}
       eyebrow={`${weekday} · ${formatNightDate(meal.nightDate)}`}
       backHref="/week"
       backLabel={pendingRecipe ? RECIPE_PENDING_BACK : undefined}
     >
-      {locked ? (
+      {weekLocked ? (
         skipped ? (
           <p className="type-body rounded-[14px] bg-secondary p-4 shadow-card">
             This night is off. It did not go on the shopping list.

@@ -66,29 +66,40 @@ describe("Clear Sky lock-success craft", () => {
       "utf8",
     );
     const week = readFileSync(path.resolve(import.meta.dirname, "../app/week/page.tsx"), "utf8");
+    const chrome = readFileSync(
+      path.resolve(import.meta.dirname, "../components/week-chrome.tsx"),
+      "utf8",
+    );
 
     expect(week).toContain("footer={!locked && check.ready ? <LockBar /> : undefined}");
-    expect(week).toContain("{locked ? <div className=\"mb-4\"><LockBar /></div> : null}");
+    expect(week).toContain("<WeekChrome");
+    expect(week).toContain("<UnlockWeekControl");
     expect(lockBar).toContain('data-slot="lock-bar"');
     expect(lockBar).toContain('data-state="ready"');
-    expect(lockBar).toContain('data-state="locked"');
-    expect(lockBar).toContain('data-slot="lock-success-list"');
-    expect(lockBar).toContain('data-slot="lock-success-recipes"');
     expect(lockBar).toContain("Lock this week");
     expect(lockBar).toContain('import { Loader2, Lock } from "lucide-react"');
     expect(lockBar).toMatch(
       /variant="primary"[\s\S]*?className="w-full gap-2 shadow-float"[\s\S]*?<Lock className="size-5" \/>[\s\S]*?Lock this week/,
     );
     expect(lockBar).toContain("variant=\"primary\"");
-    expect(lockBar).toContain("ring-1 ring-primary/20");
     expect(lockBar).toContain("bg-card");
-    expect(lockBar).toContain("text-primary");
-    expect(lockBar).toContain("lockSuccessRecipesCta");
+    expect(chrome).toContain('data-slot="lock-success-list"');
+    expect(chrome).toContain('data-slot="lock-success-recipes"');
+    expect(chrome).toContain("LOCK_SUCCESS_LIST_CTA");
+    expect(chrome).toContain("lockSuccessRecipesKicker");
+    expect(chrome).toContain("text-white");
+    expect(chrome).toContain("truncate");
+    expect(chrome).toContain("rounded-[12px]");
+    expect(chrome).toContain("p-4");
+    expect(chrome).not.toContain("See recipes");
+    expect(chrome).not.toContain("lockSuccessRecipesCta");
     expect(lockBar).not.toContain("#b35025");
     expect(lockBar).not.toContain("Fraunces");
     expect(lockBar).not.toContain("Kroger");
     expect(lockBar).not.toContain("cart");
+    expect(chrome).not.toContain("cart");
     expect(lockBar).not.toContain("$");
+    expect(chrome).not.toMatch(/\$\d/);
     expect(lockBar).not.toContain("Clear Sky");
     expect(lockBar).not.toContain("Blue & White");
   });

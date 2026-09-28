@@ -6,6 +6,7 @@ import type {
   HouseholdSnapshot,
   MealProposalInput,
   Role,
+  ShoppingPrompt,
   Vote,
   VoteChoice,
 } from "@/lib/types";
@@ -43,6 +44,16 @@ export function dropOptimistic<T>(
 
 export function applyOptimistic<T>(base: T, pending: readonly PendingOptimistic<T>[]): T {
   return pending.reduce((value, patch) => patch.apply(value), base);
+}
+
+export function patchShoppingPrompt(
+  snapshot: HouseholdSnapshot,
+  shoppingPrompt: ShoppingPrompt,
+): HouseholdSnapshot {
+  return {
+    ...snapshot,
+    week: { ...snapshot.week, shoppingPrompt },
+  };
 }
 
 export function patchItemChecked(

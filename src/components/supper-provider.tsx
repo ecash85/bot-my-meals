@@ -5,6 +5,7 @@ import { BallotToast } from "@/components/ballot-toast";
 import { isSupabaseConfigured } from "@/lib/config";
 import { storeSlugForAdd } from "@/lib/grocers";
 import { createId } from "@/lib/ids";
+import { todayInTimeZone } from "@/lib/meal-history";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import {
   OPTIMISTIC_STORE_PREFIX,
@@ -17,6 +18,7 @@ import {
   patchStoreAdded,
   patchStoreRemoved,
   LIST_CHECK_SAVE_ERROR,
+  patchShoppingPrompt,
   patchVote,
   queueOptimistic,
   type OptimisticPatch,
@@ -40,6 +42,7 @@ import {
   supabaseSetMemberRole,
   supabaseSetVote,
   supabaseToggleItem,
+  supabaseSetShoppingPrompt,
   supabaseUnlockWeek,
   supabaseUpdateHousehold,
 } from "@/lib/supabase/repo";
@@ -51,6 +54,7 @@ import type {
   MealProposalInput,
   Role,
   Session,
+  ShoppingPrompt,
   VoteChoice,
 } from "@/lib/types";
 import type { MemberDraft } from "@/lib/users";
@@ -85,6 +89,7 @@ type SupperContextValue = {
   markLeftovers: (mealId: string, sourceMealId: string) => Promise<void>;
   lockWeek: () => Promise<void>;
   unlockWeek: () => Promise<void>;
+  closeShoppingPrompt: (prompt: Extract<ShoppingPrompt, "done" | "dismissed">) => Promise<void>;
   toggleItem: (itemId: string, checked: boolean) => Promise<void>;
   updateHousehold: (patch: HouseholdSettingsPatch) => Promise<void>;
   addStore: (slug: string, name: string) => Promise<void>;
@@ -130,6 +135,7 @@ function createSetupContext(): SupperContextValue {
     markLeftovers: async () => setupUnavailable(),
     lockWeek: async () => setupUnavailable(),
     unlockWeek: async () => setupUnavailable(),
+    closeShoppingPrompt: async () => setupUnavailable(),
     toggleItem: async () => setupUnavailable(),
     updateHousehold: async () => setupUnavailable(),
     addStore: async () => setupUnavailable(),
@@ -479,7 +485,14 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
         run(async () => {
           const client = createSupabaseBrowserClient();
           if (!client || !session || !snapshot) throw new Error("Not signed in");
-          await supabaseUnlockWeek(client, session, snapshot.week.id);
+          const editableFrom = todayInTimeZone(new Date(), snapshot.household.timezone);
+          await supabaseUnlockWeek(client, session, snapshot.week.id, editableFrom);
+        }),
+      closeShoppingPrompt: (prompt) =>
+        runOptimistic("shopping-prompt", (snap) => patchShoppingPrompt(snap, prompt), async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client || !snapshot) throw new Error("Not signed in");
+          await supabaseSetShoppingPrompt(client, snapshot.week.id, prompt);
         }),
       toggleItem: (itemId, checked) =>
         runOptimistic(`item:${itemId}`, (snap) => patchItemChecked(snap, itemId, checked), async () => {

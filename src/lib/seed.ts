@@ -47,6 +47,8 @@ export function applySampleWeek(snapshot: HouseholdSnapshot, now = new Date()): 
     startsOn,
     status: "voting",
     lockedAt: null,
+    editableFrom: null,
+    shoppingPrompt: "open",
   };
   const stores = snapshot.stores.length > 0 ? snapshot.stores : defaultStores(household.id);
   const storeTj =
@@ -292,6 +294,8 @@ export function emptyHousehold(name: string, owner?: UserProfile): HouseholdSnap
       startsOn: startOfWeek(new Date(), household.weekStartsOn),
       status: "voting",
       lockedAt: null,
+      editableFrom: null,
+      shoppingPrompt: "open",
     },
     meals: [],
     votes: [],

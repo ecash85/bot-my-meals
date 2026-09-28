@@ -279,11 +279,15 @@ describe("post-lock waiting copy", () => {
     const recipes = readFileSync(path.join(root, "app/recipes/page.tsx"), "utf8");
     const block = readFileSync(path.join(root, "components/recipe-view.tsx"), "utf8");
 
-    expect(lockBar).toContain("isPendingBotFill");
-    expect(lockBar).toContain("PostLockWaitingCard");
-    expect(lockBar).toContain('data-state="pending"');
-    expect(lockBar).toContain('data-slot="lock-success-list"');
-    expect(lockBar).toContain('data-state="locked"');
+    const chrome = readFileSync(path.join(root, "components/week-chrome.tsx"), "utf8");
+
+    expect(week).toContain("isPendingBotFill");
+    expect(week).toContain("PostLockWaitingCard");
+    expect(week).toContain('data-state="pending"');
+    expect(chrome).toContain('data-slot="lock-success-list"');
+    expect(chrome).toContain('data-slot="lock-success-recipes"');
+    expect(lockBar).toContain('data-state="ready"');
+    expect(lockBar).not.toContain("Open shopping list");
     expect(week).toContain("LockedNightFrame");
     expect(week).toContain("PostLockWaitingSheet");
     expect(week).toContain("lockedDinnerTap");

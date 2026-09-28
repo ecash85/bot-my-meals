@@ -20,6 +20,7 @@ export function AppShell({
   backHref,
   backLabel = "This week",
   status,
+  titleAside,
   footer,
   hideNav = false,
   children,
@@ -29,6 +30,7 @@ export function AppShell({
   backHref?: string;
   backLabel?: string;
   status?: ReactNode;
+  titleAside?: ReactNode;
   footer?: ReactNode;
   hideNav?: boolean;
   children: ReactNode;
@@ -49,7 +51,7 @@ export function AppShell({
 
   return (
     <div
-      className="mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background"
+      className="mx-auto flex min-h-dvh w-full min-w-0 max-w-lg flex-col bg-background"
       style={{ "--shell-head-h": `${headH}px` } as CSSProperties}
     >
       <div
@@ -69,11 +71,23 @@ export function AppShell({
           {eyebrow ? (
             <p className={cn("type-eyebrow text-primary", !backHref && "mt-3")}>{eyebrow}</p>
           ) : null}
-          <h1 className={cn("type-title text-foreground", !eyebrow && !backHref && "mt-2")}>{title}</h1>
+          {titleAside ? (
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-x-2 gap-y-1",
+                !eyebrow && !backHref && "mt-2",
+              )}
+            >
+              <h1 className="type-title text-foreground">{title}</h1>
+              {titleAside}
+            </div>
+          ) : (
+            <h1 className={cn("type-title text-foreground", !eyebrow && !backHref && "mt-2")}>{title}</h1>
+          )}
         </header>
         {status}
       </div>
-      <main className={cn("flex-1 px-4 pt-4", footer ? "pb-20" : hideNav ? "pb-10" : "pb-36")}>
+      <main className={cn("min-w-0 flex-1 px-4 pt-4", footer ? "pb-20" : hideNav ? "pb-10" : "pb-36")}>
         {children}
       </main>
       {footer ? (

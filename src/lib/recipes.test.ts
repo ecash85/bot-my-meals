@@ -75,6 +75,12 @@ describe("firstCookableMeal", () => {
     ];
     expect(firstCookableMeal(meals, votes)?.title).toBe("Monday");
   });
+
+  it("skips nights before today in the house timezone", () => {
+    const meals = [meal(0, "Sunday"), meal(1, "Monday"), meal(2, "Tuesday")];
+    expect(firstCookableMeal(meals, [], "2026-09-03")?.title).toBe("Tuesday");
+    expect(firstCookableMeal(meals, [], "2026-09-04")).toBeUndefined();
+  });
 });
 
 describe("people-per-night servings", () => {

@@ -3,6 +3,12 @@ export const LOCK_SUCCESS_RECIPES_CTA = "See recipes";
 export const LOCK_SUCCESS_LIST_KICKER = "Next up";
 export const LOCK_SUCCESS_RECIPES_KICKER = "First meal";
 
+export const LOCKED_CHIP_LABEL = "Locked";
+export const UNLOCK_WEEK_LABEL = "Unlock week";
+export const UNLOCK_WEEK_CONFIRM = "Unlock so you can edit what’s left?";
+export const DONE_SHOPPING_LABEL = "Done shopping";
+export const DISMISS_SHOPPING_LABEL = "Dismiss";
+
 export const LIST_LOCKED_SECONDARY = "Check off as you shop. No prices — just what you need.";
 
 /** Ballot-3 — /list and /recipes pre-lock empties. Brief §5–6 / §7. */
