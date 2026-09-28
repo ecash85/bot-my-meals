@@ -2,6 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { BallotToast } from "@/components/ballot-toast";
+import { botCheckForSnapshot } from "@/lib/bot-check";
+import { shouldWakeNeedsWork } from "@/lib/bot-wake";
+import { requestBotWake } from "@/lib/bot-wake-client";
 import { isSupabaseConfigured } from "@/lib/config";
 import { storeSlugForAdd } from "@/lib/grocers";
 import { createId } from "@/lib/ids";
@@ -333,6 +336,20 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refresh]);
 
+  const needsWorkRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!snapshot) {
+      needsWorkRef.current = null;
+      return;
+    }
+    const needs = botCheckForSnapshot(snapshot).needs_work;
+    const previous = needsWorkRef.current;
+    needsWorkRef.current = needs;
+    if (shouldWakeNeedsWork(previous, needs)) {
+      void requestBotWake("needs_work");
+    }
+  }, [snapshot]);
+
   const value = useMemo<SupperContextValue>(
     () => ({
       ready,
@@ -495,6 +512,7 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           const client = createSupabaseBrowserClient();
           if (!client || !session || !snapshot) throw new Error("Not signed in");
           await supabaseLockWeek(client);
+          void requestBotWake("week_locked");
         }),
       unlockWeek: () =>
         run(async () => {

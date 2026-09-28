@@ -791,6 +791,21 @@ async function loadLockedWeekFill(
   return { recipes, shoppingList };
 }
 
+export async function supabaseCurrentWeekLocked(
+  client: SupabaseClient,
+  householdId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("weeks")
+    .select("status")
+    .eq("household_id", householdId)
+    .order("starts_on", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.status === "locked";
+}
+
 /** Quiet-wake read. Recipe and shopping rows load only after the week is locked. */
 export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<BotCheckStatusResult> {
   const { data: userData, error: userError } = await client.auth.getUser();

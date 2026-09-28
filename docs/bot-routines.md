@@ -1,8 +1,22 @@
 # Household bot check routine
 
-Shared Grok Bots poll this household’s Worker. The app does not push, and **Check now** only tells someone to message their Bot.
+Shared Grok Bots poll this household’s Worker on an adaptive schedule. That poll is the fallback when no webhook is set, and when a wake POST fails.
 
-## Create or update the routine
+## Wake on app event
+
+1. In the Bot My Meals Grok Bot, create a routine named “Wake on app event” with a webhook trigger.
+2. Instruction: on wake, sync this household (ballot, recipes, shopping list, setup) from the app. Stay quiet if nothing changed.
+3. Open the saved routine. Copy **POST to** (the webhook URL) and **key**. The panel keeps them separate. Senders include the key as `Authorization: Bearer <key>`.
+4. An Admin pastes both into **House → Wake your Bot**. The Worker stores them as secrets `BOT_WAKE_WEBHOOK_URL` and `BOT_WAKE_WEBHOOK_KEY`. They are not `NEXT_PUBLIC_` and they are not in the browser bundle.
+5. DIY alternative: `npx wrangler secret put BOT_WAKE_WEBHOOK_URL` and `npx wrangler secret put BOT_WAKE_WEBHOOK_KEY`.
+
+To let House save those two secrets, set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` on the Worker once (Workers Scripts edit for `bot-my-meals`). Without them, use step 5.
+
+The Worker POSTs when the week locks (`week_locked`), when bot status flips to needs work (`needs_work`), and when someone taps **Check now** or **Get recipes now** (`check_now`). The JSON body is only `source`, `event`, `household_host`, and `at`. At most one POST per household per event about every 30 seconds. A failed POST is logged; the schedule still runs, and the screen does not wait on it.
+
+With the URL set, **Check now** says “Wakes your Bot My Meals bot now.” **Get recipes now** says “Wakes your bot to fill recipes and the shopping list.” A recipe that is still waiting says “Wakes your bot to fill this recipe.” If the wake does not go through, the screen says “Couldn’t reach your bot. Try again or message it.” After you save in House, the page shows “Saved. Check now will wake your bot.” and **Saved · Replace**. It does not show the URL or key again. Without the URL, those hints still tell someone to message the Bot.
+
+## Create or update the polling routine
 
 Adaptive is the default.
 

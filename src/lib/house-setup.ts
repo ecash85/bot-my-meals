@@ -164,6 +164,7 @@ export function grokBotPastePrompt(input: {
     "On each run, read GET /api/bot/status and House → Bot check frequency. Do the work when needs_work is true, and stay silent when nothing changed.",
     "fill_pending means this locked week still needs recipes or a shopping list. Write those, and skip a list when nothing needs buying.",
     "If that setting changes, update your own routine.",
+    "Also keep a webhook routine named Wake on app event. On wake, sync this household (ballot, recipes, shopping list, setup) from the app, and stay quiet if nothing changed.",
     "Never invent grocery prices. Never claim Smith's cart adds.",
   ].join(" ");
 }

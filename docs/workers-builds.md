@@ -38,7 +38,7 @@ Tim’s household Worker `bot-my-meals` on his Cloudflare account deploys from t
 8. **Deploy command**: `node scripts/cf-deploy.mjs`
 9. **Non-production branch deploy command**: `npm run deploy:preview`
 10. Optional **Build watch paths** from the table above.
-11. Confirm runtime vars `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are on the Worker (**Settings → Variables & Secrets**). Also add them under **Build variables** so OpenNext can inline them. Never put the service-role key here.
+11. Confirm runtime vars `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are on the Worker (**Settings → Variables & Secrets**). Also add them under **Build variables** so OpenNext can inline them. Never put the service-role key here. Optional secrets (not build variables, not `NEXT_PUBLIC_`): `BOT_WAKE_WEBHOOK_URL` and `BOT_WAKE_WEBHOOK_KEY`. See [`docs/bot-routines.md`](bot-routines.md).
 12. **Save**. New settings apply to the **next** build.
 
 ## Verify

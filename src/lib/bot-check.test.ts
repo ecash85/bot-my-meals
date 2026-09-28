@@ -403,6 +403,7 @@ describe("Settings and Waiting copy lock", () => {
     const settings = readFileSync(path.join(srcRoot, "app/settings/page.tsx"), "utf8");
     const week = readFileSync(path.join(srcRoot, "app/week/page.tsx"), "utf8");
     const card = readFileSync(path.join(srcRoot, "components/bot-check-frequency.tsx"), "utf8");
+    const wake = readFileSync(path.join(srcRoot, "components/use-bot-wake.ts"), "utf8");
     const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");
     const setupPage = readFileSync(path.join(srcRoot, "app/setup/page.tsx"), "utf8");
 
@@ -416,8 +417,10 @@ describe("Settings and Waiting copy lock", () => {
     expect(card).toContain("BOT_CHECK_SECTION_LABEL");
     expect(card).toContain("BOT_CHECK_NOW_HINT");
     expect(card).not.toContain("Force sync");
-    expect(card).not.toContain("toast");
+    expect(card).not.toMatch(/APNs|Instant push|phone push/);
     expect(card).not.toContain("fetch(");
+    expect(wake).toContain("BOT_WAKE_SOFT_FAIL");
+    expect(wake).not.toMatch(/APNs|Instant push|phone push/);
     expect(card).not.toContain("WeeklyBudgetField");
     expect(wizard).not.toContain("bot-check-frequency");
     expect(wizard).not.toContain("BotCheckFrequency");

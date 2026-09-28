@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { BallotToast } from "@/components/ballot-toast";
 import { HouseCard } from "@/components/house-card";
+import { useBotWakeConfigured, useWakeNow } from "@/components/use-bot-wake";
+import { Button } from "@/components/ui/button";
 import {
   BOT_CHECK_HELPER,
   BOT_CHECK_NOW_HINT,
@@ -14,14 +17,43 @@ import {
   type BotCheckChoice,
   type BotCheckStatus,
 } from "@/lib/bot-check";
+import { BOT_CHECK_NOW_WAKE_HINT } from "@/lib/bot-wake";
+import type { WakeClientResult } from "@/lib/bot-wake-client";
 import type { BotCheckIntervalHours, BotCheckMode, HouseholdSettingsPatch } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function BotCheckNow({ className }: { className?: string }) {
+export function BotCheckNow({
+  className,
+  wakeConfigured,
+  onCheckNow,
+}: {
+  className?: string;
+  wakeConfigured?: boolean;
+  onCheckNow?: () => void | Promise<WakeClientResult | void>;
+}) {
+  const configured = useBotWakeConfigured(wakeConfigured);
+  const { busy, message, dismiss, wake } = useWakeNow(onCheckNow);
+  const hint = configured ? BOT_CHECK_NOW_WAKE_HINT : BOT_CHECK_NOW_HINT;
+
   return (
-    <div data-slot="bot-check-now" className={cn("mt-4", className)}>
-      <p className="type-body font-semibold">{BOT_CHECK_NOW_LABEL}</p>
-      <p className="type-meta mt-1 text-muted-foreground">{BOT_CHECK_NOW_HINT}</p>
+    <div data-slot="bot-check-now" data-wake={configured ? "on" : "off"} className={cn("mt-4", className)}>
+      {configured ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="fat"
+          className="w-full"
+          disabled={busy}
+          aria-busy={busy}
+          onClick={wake}
+        >
+          {BOT_CHECK_NOW_LABEL}
+        </Button>
+      ) : (
+        <p className="type-body font-semibold">{BOT_CHECK_NOW_LABEL}</p>
+      )}
+      <p className="type-meta mt-1 text-muted-foreground">{hint}</p>
+      <BallotToast message={message} onDismiss={dismiss} />
     </div>
   );
 }

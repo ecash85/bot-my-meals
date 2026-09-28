@@ -7,6 +7,7 @@ import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { ChevronRight } from "lucide-react";
 import { AppearancePicker } from "@/components/appearance-picker";
 import { BotCheckFrequency } from "@/components/bot-check-frequency";
+import { BotWakeSettings } from "@/components/bot-wake-settings";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { HouseCard } from "@/components/house-card";
@@ -204,6 +205,8 @@ function SettingsBody() {
           </p>
         )}
       </HouseCard>
+
+      <BotWakeSettings canEdit={owner} />
 
       <BotCheckFrequency
         mode={snapshot.household.botCheckMode}
