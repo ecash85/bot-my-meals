@@ -17,7 +17,7 @@ import {
   RECIPES_NO_HOUSEHOLD,
   RECIPES_PRE_LOCK_DESCRIPTION,
 } from "@/lib/lock-success";
-import { RECIPE_PENDING_BACK, isPendingBotFill } from "@/lib/post-lock-waiting";
+import { isPendingBotFill } from "@/lib/post-lock-waiting";
 import { firstCookableMeal, recipeNightsForWeek } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,7 @@ function RecipesBody() {
         title="Recipes"
         eyebrow={formatWeekEyebrow(snapshot.week.startsOn)}
         backHref="/week"
+        backLabel="This week"
       >
         <LockFirstEmpty
           title={LOCK_FIRST_TITLE}
@@ -78,7 +79,7 @@ function RecipesBody() {
         title="Recipes"
         eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
         backHref="/week"
-        backLabel={RECIPE_PENDING_BACK}
+        backLabel="This week"
       >
         <PostLockWaitingCard
           mode={snapshot.household.botCheckMode}
@@ -94,6 +95,7 @@ function RecipesBody() {
         title="Recipes"
         eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
         backHref="/week"
+        backLabel="This week"
       >
         <div className="rounded-[14px] border border-dashed border-border bg-card p-5 shadow-card">
           <h2 className="type-section">No dinners yet</h2>
@@ -108,6 +110,7 @@ function RecipesBody() {
       title="Recipes"
       eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
       backHref="/week"
+      backLabel="This week"
       status={<StatusStrip state="locked" people={[]} />}
     >
       <div className="space-y-3">

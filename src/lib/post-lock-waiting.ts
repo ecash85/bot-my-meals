@@ -27,7 +27,6 @@ export const RECIPE_PENDING_TITLE = "Waiting for your Bot";
 export const RECIPE_PENDING_BODY = "Your bot hasn\u2019t saved this recipe yet.";
 export const RECIPE_PENDING_HINT =
   "Message your Bot My Meals Grok Bot and ask it to fill recipes for this week.";
-export const RECIPE_PENDING_BACK = "Back to This week";
 
 export type PendingBotFillInput = {
   weekStatus: WeekStatus;

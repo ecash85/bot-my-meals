@@ -14,7 +14,7 @@ import { formatNightDate, weekdayLabelFromNight } from "@/lib/dates";
 import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
-import { RECIPE_PENDING_BACK, nightShowsRecipePending } from "@/lib/post-lock-waiting";
+import { nightShowsRecipePending } from "@/lib/post-lock-waiting";
 import { nightStaysLocked } from "@/lib/week-chrome";
 import type { VoteChoice } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,7 @@ function MealDetail({ mealId }: { mealId: string }) {
 
   if (!snapshot || !meal) {
     return (
-      <AppShell title="Night" backHref="/week">
+      <AppShell title="Night" backHref="/week" backLabel="This week">
         <p className="type-body text-muted-foreground">That night is not on this week.</p>
       </AppShell>
     );
@@ -94,7 +94,7 @@ function MealDetail({ mealId }: { mealId: string }) {
       title={skipped && readOnly ? EMPTY_DAY_TITLE : meal.title}
       eyebrow={`${weekday} · ${formatNightDate(meal.nightDate)}`}
       backHref="/week"
-      backLabel={pendingRecipe ? RECIPE_PENDING_BACK : undefined}
+      backLabel="This week"
     >
       {weekLocked ? (
         skipped ? (

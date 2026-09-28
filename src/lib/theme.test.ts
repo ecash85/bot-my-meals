@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { ChromeBackLink } from "@/components/chrome-back";
 import { PRODUCT_TAGLINE } from "./config";
 import { contrastRatio, WCAG_AA_NORMAL } from "./contrast";
 import {
@@ -152,8 +155,51 @@ describe("theme D Clear Sky brand tokens", () => {
     expect(header).toContain('data-slot="app-header"');
     expect(header).toContain('<BrandMark size="compact" />');
     expect(header.indexOf("<BrandMark")).toBeLessThan(header.indexOf("{backHref"));
-    expect(header).toContain("← {backLabel}");
+    expect(header).toContain("<ChromeBackLink");
+    expect(header).toContain("label={backLabel}");
+    expect(header).toContain('backHref ? "text-muted-foreground" : "mt-3 text-primary"');
+    expect(header).not.toContain("←");
     expect(header).not.toMatch(/backHref \? \([\s\S]*\) : \(\s*<BrandMark/);
+    expect(contrastRatio(THEME_FOREGROUND, THEME_CARD)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
+    expect(contrastRatio(THEME_DARK_FOREGROUND, THEME_DARK_CARD)).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
+
+    const markup = renderToStaticMarkup(
+      createElement(ChromeBackLink, { href: "/week", label: "This week" }),
+    );
+    expect(markup).toContain('data-slot="chrome-back"');
+    expect(markup).toContain('href="/week"');
+    expect(markup).toContain("This week");
+    expect(markup).toContain("<svg");
+    expect(markup).not.toContain("←");
+
+    const back = readFileSync(path.join(srcRoot, "components/chrome-back.tsx"), "utf8");
+    expect(back).toContain("ChevronLeft");
+    expect(back).toContain('data-slot="chrome-back"');
+    expect(back).toContain("min-h-11");
+    expect(back).toContain("min-w-11");
+    expect(back).toContain("size-5");
+    expect(back).toContain("text-[16px]");
+    expect(back).toContain("font-semibold");
+    expect(back).toContain("text-foreground");
+    expect(back).toContain("mt-2");
+    expect(back).toContain("mb-4");
+    expect(back).toContain("py-3");
+    expect(back).toContain("dark:bg-[rgba(255,255,255,0.08)]");
+    expect(back).toContain("{label}");
+    expect(back).not.toContain("←");
+    expect(back).not.toContain("text-primary");
+    expect(back).not.toContain("type-meta");
+    expect(back).not.toContain("Back to This week");
+    expect(shell).toContain('backLabel = "This week"');
+    expect(shell).not.toContain('backLabel = "Back"');
+
+    for (const label of ["This week", "Recipes", "Past weeks", "House"]) {
+      const swapped = renderToStaticMarkup(createElement(ChromeBackLink, { href: "/week", label }));
+      expect(swapped).toContain(label);
+      expect(swapped).toContain("<svg");
+      expect(swapped).not.toContain("←");
+      expect(swapped).not.toContain("Back to");
+    }
 
     const manifest = readFileSync(path.join(srcRoot, "app/manifest.ts"), "utf8");
     expect(manifest).toContain("BRAND_ICON_192_SRC");

@@ -11,7 +11,6 @@ import {
   POST_LOCK_GET_RECIPES_LABEL,
   POST_LOCK_WAITING_BODY,
   POST_LOCK_WAITING_TITLE,
-  RECIPE_PENDING_BACK,
   RECIPE_PENDING_BODY,
   RECIPE_PENDING_HINT,
   RECIPE_PENDING_TITLE,
@@ -224,7 +223,6 @@ describe("post-lock waiting copy", () => {
     expect(RECIPE_PENDING_HINT).toBe(
       "Message your Bot My Meals Grok Bot and ask it to fill recipes for this week.",
     );
-    expect(RECIPE_PENDING_BACK).toBe("Back to This week");
 
     const blob = [
       POST_LOCK_WAITING_TITLE,
@@ -292,7 +290,11 @@ describe("post-lock waiting copy", () => {
     expect(week).toContain("PostLockWaitingSheet");
     expect(week).toContain("lockedDinnerTap");
     expect(meal).toContain("RecipePendingNotice");
-    expect(meal).toContain("RECIPE_PENDING_BACK");
+    expect(meal).toContain('backHref="/week"');
+    expect(meal).toContain('backLabel="This week"');
+    expect(meal).not.toContain("Back to This week");
+    expect(recipes).toContain('backLabel="This week"');
+    expect(recipes).not.toContain("Back to This week");
     expect(meal).toContain("<RecipeBlock recipe={recipe} servings={meal.servings} />");
     expect(meal).not.toContain("No recipe was saved for this night");
     expect(list).toContain("pendingFill && (!list || list.items.length === 0)");

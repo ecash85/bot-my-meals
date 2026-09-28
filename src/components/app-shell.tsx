@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, ClipboardList, Settings2, Utensils } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { ChromeBackLink } from "@/components/chrome-back";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -60,16 +61,11 @@ export function AppShell({
       >
         <header className="px-5 pb-3 pt-2" data-slot="app-header">
           <BrandMark size="compact" />
-          {backHref ? (
-            <Link
-              href={backHref}
-              className="type-meta mt-3 mb-1 inline-flex min-h-8 items-center font-semibold text-primary"
-            >
-              ← {backLabel}
-            </Link>
-          ) : null}
+          {backHref ? <ChromeBackLink href={backHref} label={backLabel} /> : null}
           {eyebrow ? (
-            <p className={cn("type-eyebrow text-primary", !backHref && "mt-3")}>{eyebrow}</p>
+            <p className={cn("type-eyebrow", backHref ? "text-muted-foreground" : "mt-3 text-primary")}>
+              {eyebrow}
+            </p>
           ) : null}
           {titleAside ? (
             <div
