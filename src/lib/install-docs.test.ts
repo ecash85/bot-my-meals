@@ -12,6 +12,7 @@ function readRepo(rel: string) {
 function expectOtpInstallHappyPath(doc: string) {
   expect(doc).toMatch(/Email OTP/);
   expect(doc).toMatch(/Send code/);
+  expect(doc).toMatch(/6-digit/);
   expect(doc).toMatch(/Verify/);
   expect(doc).toMatch(/\{\{ \.Token \}\}/);
   expect(doc).toMatch(/custom SMTP/);
@@ -24,15 +25,36 @@ function expectOtpInstallHappyPath(doc: string) {
   expect(doc).not.toMatch(/grandma/i);
 }
 
-describe("Install docs — Email OTP", () => {
-  it("locks Auth, domains, and the #grok-prompt paste on Email OTP", () => {
+function expectWakeInstallPaste(paste: string) {
+  expect(paste).toMatch(/Wake on app event/);
+  expect(paste).toMatch(/Webhook URL/);
+  expect(paste).toMatch(/House → Wake your Bot/);
+  expect(paste).toMatch(/BOT_WAKE_WEBHOOK_URL/);
+  expect(paste).toMatch(/BOT_WAKE_WEBHOOK_KEY/);
+  expect(paste).toMatch(/sender key/);
+  expect(paste).toMatch(/webhook trigger/);
+  expect(paste).toMatch(/ballot \/ recipes \/ shopping list \/ setup/);
+  expect(paste).toMatch(/stay quiet if nothing changed/);
+  expect(paste).toMatch(/Never NEXT_PUBLIC/);
+  expect(paste).toMatch(/do not show the full secret again/i);
+  expect(paste).toMatch(/fallback/);
+  expect(paste).not.toMatch(/Copy POST to and key/);
+  expect(paste).not.toMatch(/NEXT_PUBLIC_BOT_WAKE/);
+  expect(paste).not.toMatch(/grandma/i);
+}
+
+describe("Install docs — Email OTP + Wake on app event", () => {
+  it("locks Auth, domains, and the #grok-prompt paste on Email OTP and Cos webhook wake", () => {
     const readme = readRepo("README.md");
     const domains = readRepo("docs/domains.md");
+    const routines = readRepo("docs/bot-routines.md");
     const paste = grokPromptPaste(readme);
 
     expect(readme).toContain('id="grok-prompt"');
     expectOtpInstallHappyPath(readme);
     expectOtpInstallHappyPath(domains);
+    expectOtpInstallHappyPath(paste);
+    expectWakeInstallPaste(paste);
 
     expect(paste).toMatch(/Email OTP/);
     expect(paste).toMatch(/Send code/);
@@ -56,7 +78,25 @@ describe("Install docs — Email OTP", () => {
     expect(paste).not.toMatch(/after Request link/);
     expect(paste).not.toMatch(/grandma/i);
     expect(paste).not.toMatch(/no store cart-add claims/);
-    expect(paste).not.toMatch(/webhook-wake/i);
+
+    expect(readme).toMatch(/Wake on app event/);
+    expect(readme).toMatch(/Webhook URL/);
+    expect(readme).toMatch(/House → Wake your Bot/);
+    expect(readme).toMatch(/BOT_WAKE_WEBHOOK_URL/);
+    expect(readme).not.toMatch(/grandma/i);
+
+    expect(routines).toMatch(/Wake on app event/);
+    expect(routines).toMatch(/Webhook URL/);
+    expect(routines).toMatch(/House → Wake your Bot/);
+    expect(routines).toMatch(/BOT_WAKE_WEBHOOK_URL/);
+    expect(routines).toMatch(/BOT_WAKE_WEBHOOK_KEY/);
+    expect(routines).toMatch(/sender key/);
+    expect(routines).toMatch(/Never `NEXT_PUBLIC_`/);
+    expect(routines).toMatch(/Saved · Replace/);
+    expect(routines).toMatch(/stay quiet if nothing changed/);
+    expect(routines).toMatch(/fallback/);
+    expect(routines).not.toMatch(/Copy \*\*POST to\*\* \(the webhook URL\) and \*\*key\*\*/);
+    expect(routines).not.toMatch(/grandma/i);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {
