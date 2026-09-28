@@ -50,10 +50,32 @@ export function applyOptimistic<T>(base: T, pending: readonly PendingOptimistic<
 export function patchShoppingPrompt(
   snapshot: HouseholdSnapshot,
   shoppingPrompt: ShoppingPrompt,
+  weekId?: string,
 ): HouseholdSnapshot {
+  if (weekId && snapshot.planning?.week.id === weekId) {
+    return {
+      ...snapshot,
+      planning: {
+        ...snapshot.planning,
+        week: { ...snapshot.planning.week, shoppingPrompt },
+      },
+    };
+  }
   return {
     ...snapshot,
     week: { ...snapshot.week, shoppingPrompt },
+  };
+}
+
+function withCheckedItems(
+  list: HouseholdSnapshot["shoppingList"],
+  itemId: string,
+  checked: boolean,
+): HouseholdSnapshot["shoppingList"] {
+  if (!list) return list;
+  return {
+    ...list,
+    items: list.items.map((item) => (item.id === itemId ? { ...item, checked } : item)),
   };
 }
 
@@ -62,19 +84,24 @@ export function patchItemChecked(
   itemId: string,
   checked: boolean,
 ): HouseholdSnapshot {
-  const list = snapshot.shoppingList;
-  if (!list) return snapshot;
+  const planningList = snapshot.planning?.shoppingList;
+  if (planningList?.items.some((item) => item.id === itemId) && snapshot.planning) {
+    return {
+      ...snapshot,
+      planning: {
+        ...snapshot.planning,
+        shoppingList: withCheckedItems(planningList, itemId, checked),
+      },
+    };
+  }
   return {
     ...snapshot,
-    shoppingList: {
-      ...list,
-      items: list.items.map((item) => (item.id === itemId ? { ...item, checked } : item)),
-    },
+    shoppingList: withCheckedItems(snapshot.shoppingList, itemId, checked),
   };
 }
 
-export function patchVote(
-  snapshot: HouseholdSnapshot,
+function nextVotes(
+  votes: Vote[],
   input: {
     mealId: string;
     membershipId: string;
@@ -82,10 +109,10 @@ export function patchVote(
     choice: VoteChoice;
     note: string;
   },
-): HouseholdSnapshot {
+): Vote[] {
   const note = voteNotePersists(input.choice) ? input.note : "";
   const updatedAt = new Date().toISOString();
-  const existing = snapshot.votes.find(
+  const existing = votes.find(
     (vote) => vote.mealId === input.mealId && vote.membershipId === input.membershipId,
   );
   const nextVote: Vote = existing
@@ -99,10 +126,31 @@ export function patchVote(
         note,
         updatedAt,
       };
-  const votes = existing
-    ? snapshot.votes.map((vote) => (vote.id === existing.id ? nextVote : vote))
-    : [...snapshot.votes, nextVote];
-  return { ...snapshot, votes };
+  return existing
+    ? votes.map((vote) => (vote.id === existing.id ? nextVote : vote))
+    : [...votes, nextVote];
+}
+
+export function patchVote(
+  snapshot: HouseholdSnapshot,
+  input: {
+    mealId: string;
+    membershipId: string;
+    householdId: string;
+    choice: VoteChoice;
+    note: string;
+  },
+): HouseholdSnapshot {
+  if (snapshot.planning?.meals.some((meal) => meal.id === input.mealId)) {
+    return {
+      ...snapshot,
+      planning: {
+        ...snapshot.planning,
+        votes: nextVotes(snapshot.planning.votes, input),
+      },
+    };
+  }
+  return { ...snapshot, votes: nextVotes(snapshot.votes, input) };
 }
 
 export function patchHousehold(
@@ -130,19 +178,22 @@ export function patchHousehold(
   }
 
   let meals = snapshot.meals;
+  let planning = snapshot.planning;
   if (patch.nightHeadcounts !== undefined) {
     household = withDerivedNightSettings(household, patch.nightHeadcounts);
     household = {
       ...household,
       nightsPlanned: nightsPlannedFromHeadcounts(household.nightHeadcounts),
     };
-    meals = snapshot.meals.map((meal) => {
+    const resize = (meal: HouseholdSnapshot["meals"][number]) => {
       const servings = headcountForNight(household, meal.nightDate);
       return { ...meal, servings, audience: audienceFromHeadcount(servings) };
-    });
+    };
+    meals = snapshot.meals.map(resize);
+    if (planning) planning = { ...planning, meals: planning.meals.map(resize) };
   }
 
-  return { ...snapshot, household, meals };
+  return { ...snapshot, household, meals, planning };
 }
 
 export function patchStoreAdded(
@@ -213,27 +264,39 @@ export function patchSavedMealRequest(
   };
 }
 
+function applyProposal(meal: HouseholdSnapshot["meals"][number], proposal: MealProposalInput) {
+  return {
+    ...meal,
+    title: proposal.title,
+    pitch: proposal.pitch,
+    prepMinutes: proposal.prepMinutes,
+    audience: proposal.audience ?? meal.audience,
+    servings: proposal.servings ?? meal.servings,
+    isLeftovers: false,
+    leftoverOfMealId: null,
+  };
+}
+
 export function patchMealProposal(
   snapshot: HouseholdSnapshot,
   mealId: string,
   proposal: MealProposalInput,
 ): HouseholdSnapshot {
+  if (snapshot.planning?.meals.some((meal) => meal.id === mealId)) {
+    return {
+      ...snapshot,
+      planning: {
+        ...snapshot.planning,
+        meals: snapshot.planning.meals.map((meal) =>
+          meal.id === mealId ? applyProposal(meal, proposal) : meal,
+        ),
+        votes: snapshot.planning.votes.filter((vote) => vote.mealId !== mealId),
+      },
+    };
+  }
   return {
     ...snapshot,
-    meals: snapshot.meals.map((meal) =>
-      meal.id === mealId
-        ? {
-            ...meal,
-            title: proposal.title,
-            pitch: proposal.pitch,
-            prepMinutes: proposal.prepMinutes,
-            audience: proposal.audience ?? meal.audience,
-            servings: proposal.servings ?? meal.servings,
-            isLeftovers: false,
-            leftoverOfMealId: null,
-          }
-        : meal,
-    ),
+    meals: snapshot.meals.map((meal) => (meal.id === mealId ? applyProposal(meal, proposal) : meal)),
     votes: snapshot.votes.filter((vote) => vote.mealId !== mealId),
   };
 }

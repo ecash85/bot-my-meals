@@ -15,6 +15,7 @@ import type {
   Vote,
   VoteChoice,
   Week,
+  WeekScope,
 } from "@/lib/types";
 import type { MemberDraft } from "@/lib/users";
 import { voteNotePersists } from "@/lib/ballot";
@@ -22,6 +23,7 @@ import {
   botCheckForSnapshot,
   botCheckUpdateColumns,
   normalizeBotCheckSetting,
+  preferBotCheckStatus,
   type BotCheckMeal,
   type BotCheckStatus,
 } from "@/lib/bot-check";
@@ -42,8 +44,9 @@ import {
   headcountForNight,
   normalizeNightHeadcounts,
 } from "@/lib/headcount";
-import { parseMealHistory } from "@/lib/meal-history";
-import { parseSavedMeals, savedMealRequestActive } from "@/lib/saved-meals";
+import { parseMealHistory, todayInTimeZone } from "@/lib/meal-history";
+import { splitOpenWeeks } from "@/lib/open-weeks";
+import { parseSavedMeals } from "@/lib/saved-meals";
 import { redactUntilLocked } from "@/lib/visibility";
 import { parseEditableFrom, parseShoppingPrompt } from "@/lib/week-chrome";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -77,6 +80,53 @@ function mapBallotRequest(
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? ""),
     fulfilledAt: typeof row.fulfilled_at === "string" ? row.fulfilled_at : null,
+  };
+}
+
+function rowsOf<T>(data: T | T[] | null | undefined): T[] {
+  if (data == null) return [];
+  return Array.isArray(data) ? data : [data];
+}
+
+function mapWeekRow(weekRow: Record<string, unknown>): Week {
+  return {
+    id: String(weekRow.id),
+    householdId: String(weekRow.household_id),
+    startsOn: String(weekRow.starts_on).slice(0, 10),
+    status: asWeekStatus(weekRow.status) ?? "voting",
+    lockedAt: typeof weekRow.locked_at === "string" ? weekRow.locked_at : null,
+    editableFrom: parseEditableFrom(weekRow.editable_from),
+    shoppingPrompt: parseShoppingPrompt(weekRow.shopping_prompt),
+  };
+}
+
+function mapShoppingList(
+  listRow: Record<string, unknown>,
+  itemRows: readonly Record<string, unknown>[],
+): ShoppingList {
+  const listId = String(listRow.id);
+  return {
+    id: listId,
+    householdId: String(listRow.household_id),
+    weekId: String(listRow.week_id),
+    generatedAt: String(listRow.generated_at ?? ""),
+    items: itemRows
+      .filter((row) => String(row.shopping_list_id) === listId)
+      .map(
+        (row): ShoppingItem => ({
+          id: String(row.id),
+          householdId: String(row.household_id),
+          shoppingListId: String(row.shopping_list_id),
+          storeId: String(row.store_id),
+          name: String(row.name),
+          quantity: Number(row.quantity),
+          unit: String(row.unit ?? ""),
+          priceCents: typeof row.price_cents === "number" ? row.price_cents : null,
+          priceSource: typeof row.price_source === "string" ? row.price_source : null,
+          pricedAt: typeof row.priced_at === "string" ? row.priced_at : null,
+          checked: Boolean(row.checked),
+        }),
+      ),
   };
 }
 
@@ -149,13 +199,12 @@ export async function fetchSupabaseSnapshot(
       .select("*")
       .eq("household_id", householdId)
       .order("starts_on", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(8),
     client.from("meals").select("*").eq("household_id", householdId),
     client.from("votes").select("*").eq("household_id", householdId),
     client.from("recipes").select("*").eq("household_id", householdId),
     client.from("recipe_ingredients").select("*").eq("household_id", householdId),
-    client.from("shopping_lists").select("*").eq("household_id", householdId).maybeSingle(),
+    client.from("shopping_lists").select("*").eq("household_id", householdId),
     client.from("household_invites").select("*").eq("household_id", householdId),
     client
       .from("household_join_tokens")
@@ -170,9 +219,7 @@ export async function fetchSupabaseSnapshot(
       .from("ballot_requests")
       .select("*")
       .eq("household_id", householdId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order("created_at", { ascending: false }),
     client.rpc("meal_history"),
     client
       .from("saved_meals")
@@ -182,109 +229,115 @@ export async function fetchSupabaseSnapshot(
   ]);
 
   const householdRow = required(householdRes.data, householdRes.error, "Household not found");
-  const weekRow = required(weekRes.data, weekRes.error, "This household has no week yet.");
+  if (weekRes.error) throw new Error(weekRes.error.message);
+  if (listRes.error) throw new Error(listRes.error.message);
   const botCheck = normalizeBotCheckSetting(
     householdRow.bot_check_mode,
     householdRow.bot_check_interval_hours,
   );
+  const today = todayInTimeZone(new Date(), String(householdRow.timezone ?? ""));
+  const openWeeks = splitOpenWeeks(
+    rowsOf(weekRes.data).flatMap((row) => {
+      const status = asWeekStatus(row.status);
+      if (!status || typeof row.starts_on !== "string") return [];
+      return [{ row, startsOn: row.starts_on.slice(0, 10), status }];
+    }),
+    today,
+    Number(householdRow.week_starts_on) || 0,
+  );
+  const cookingRow = openWeeks.cooking?.row;
+  if (!cookingRow) throw new Error("This household has no week yet.");
 
-  const meals: Meal[] = (mealsRes.data ?? [])
-    .filter((row) => row.week_id === weekRow.id)
-    .map((row) => ({
-      id: row.id,
-      householdId: row.household_id,
-      weekId: row.week_id,
-      dayIndex: row.day_index,
-      nightDate: row.night_date,
-      title: row.title,
-      pitch: row.pitch,
-      audience: row.audience,
-      servings: row.servings,
-      prepMinutes: row.prep_minutes,
-      isLeftovers: row.is_leftovers,
-      leftoverOfMealId: row.leftover_of_meal_id,
-      estimatedCostCents: row.estimated_cost_cents,
-      estimatedCostSource: row.estimated_cost_source,
-      estimatedCostAsOf: row.estimated_cost_as_of,
-    }))
-    .sort((a, b) => a.dayIndex - b.dayIndex);
-
-  const recipes: Recipe[] = (recipesRes.data ?? [])
-    .filter((row) => meals.some((meal) => meal.id === row.meal_id))
-    .map((row) => ({
-      id: row.id,
-      mealId: row.meal_id,
-      servings: row.servings,
-      prepMinutes: row.prep_minutes,
-      cookMinutes: row.cook_minutes,
-      steps: row.steps ?? [],
-      recipeKey:
-        typeof row.recipe_key === "string" && row.recipe_key.trim() ? row.recipe_key.trim() : null,
-      ingredients: (ingredientsRes.data ?? [])
-        .filter((ingredient) => ingredient.recipe_id === row.id)
-        .map((ingredient) => ({
-          id: ingredient.id,
-          name: ingredient.name,
-          quantity: Number(ingredient.quantity),
-          unit: ingredient.unit,
-          storeId: ingredient.store_id,
-        })),
-    }));
-
-  const votes: Vote[] = (votesRes.data ?? [])
-    .filter((row) => meals.some((meal) => meal.id === row.meal_id))
-    .flatMap((row) => {
-      const choice = migrateVoteChoice(row.choice);
-      if (!choice) return [];
-      return [{
-        id: row.id,
-        householdId: row.household_id,
-        mealId: row.meal_id,
-        membershipId: row.membership_id,
-        choice,
-        note: voteNotePersists(choice) ? (row.note ?? "") : "",
-        updatedAt: row.updated_at,
-      }];
-    });
-
-  const week: Week = {
-    id: weekRow.id,
-    householdId: weekRow.household_id,
-    startsOn: weekRow.starts_on,
-    status: weekRow.status,
-    lockedAt: weekRow.locked_at,
-    editableFrom: parseEditableFrom(weekRow.editable_from),
-    shoppingPrompt: parseShoppingPrompt(weekRow.shopping_prompt),
-  };
-
-  let shoppingList: ShoppingList | null = null;
-  if (listRes.data && listRes.data.week_id === week.id) {
+  const openWeekIds = new Set(
+    [cookingRow.id, openWeeks.planning?.row.id].filter((id): id is string => Boolean(id)),
+  );
+  const listRows = rowsOf(listRes.data).filter((row) => openWeekIds.has(String(row.week_id)));
+  let shoppingItemRows: Array<Record<string, unknown>> = [];
+  if (listRows.length) {
     const itemsRes = await client
       .from("shopping_items")
       .select("*")
-      .eq("shopping_list_id", listRes.data.id);
-    shoppingList = {
-      id: listRes.data.id,
-      householdId: listRes.data.household_id,
-      weekId: listRes.data.week_id,
-      generatedAt: listRes.data.generated_at,
-      items: (itemsRes.data ?? []).map(
-        (row): ShoppingItem => ({
-          id: row.id,
-          householdId: row.household_id,
-          shoppingListId: row.shopping_list_id,
-          storeId: row.store_id,
-          name: row.name,
-          quantity: Number(row.quantity),
-          unit: row.unit,
-          priceCents: row.price_cents,
-          priceSource: row.price_source,
-          pricedAt: row.priced_at,
-          checked: row.checked,
-        }),
-      ),
-    };
+      .in(
+        "shopping_list_id",
+        listRows.map((row) => String(row.id)),
+      );
+    if (itemsRes.error) throw new Error(itemsRes.error.message);
+    shoppingItemRows = itemsRes.data ?? [];
   }
+
+  const allMeals: Meal[] = (mealsRes.data ?? []).map((row) => ({
+    id: row.id,
+    householdId: row.household_id,
+    weekId: row.week_id,
+    dayIndex: row.day_index,
+    nightDate: row.night_date,
+    title: row.title,
+    pitch: row.pitch,
+    audience: row.audience,
+    servings: row.servings,
+    prepMinutes: row.prep_minutes,
+    isLeftovers: row.is_leftovers,
+    leftoverOfMealId: row.leftover_of_meal_id,
+    estimatedCostCents: row.estimated_cost_cents,
+    estimatedCostSource: row.estimated_cost_source,
+    estimatedCostAsOf: row.estimated_cost_as_of,
+  }));
+
+  const allRecipes: Recipe[] = (recipesRes.data ?? []).map((row) => ({
+    id: row.id,
+    mealId: row.meal_id,
+    servings: row.servings,
+    prepMinutes: row.prep_minutes,
+    cookMinutes: row.cook_minutes,
+    steps: row.steps ?? [],
+    recipeKey:
+      typeof row.recipe_key === "string" && row.recipe_key.trim() ? row.recipe_key.trim() : null,
+    ingredients: (ingredientsRes.data ?? [])
+      .filter((ingredient) => ingredient.recipe_id === row.id)
+      .map((ingredient) => ({
+        id: ingredient.id,
+        name: ingredient.name,
+        quantity: Number(ingredient.quantity),
+        unit: ingredient.unit,
+        storeId: ingredient.store_id,
+      })),
+  }));
+
+  const allVotes: Vote[] = (votesRes.data ?? []).flatMap((row) => {
+    const choice = migrateVoteChoice(row.choice);
+    if (!choice) return [];
+    return [{
+      id: row.id,
+      householdId: row.household_id,
+      mealId: row.meal_id,
+      membershipId: row.membership_id,
+      choice,
+      note: voteNotePersists(choice) ? (row.note ?? "") : "",
+      updatedAt: row.updated_at,
+    }];
+  });
+
+  const scopeForRow = (weekRow: Record<string, unknown>): WeekScope => {
+    const week = mapWeekRow(weekRow);
+    const meals = allMeals
+      .filter((meal) => meal.weekId === week.id)
+      .sort((a, b) => a.dayIndex - b.dayIndex);
+    const mealIds = new Set(meals.map((meal) => meal.id));
+    const listRow = listRows.find((row) => String(row.week_id) === week.id);
+    const ballotRow = rowsOf(ballotRequestRes.data).find((row) => String(row.week_id) === week.id);
+    return {
+      week,
+      meals,
+      votes: allVotes.filter((vote) => mealIds.has(vote.mealId)),
+      recipes: allRecipes.filter((recipe) => mealIds.has(recipe.mealId)),
+      shoppingList: listRow ? mapShoppingList(listRow, shoppingItemRows) : null,
+      ballotRequest: mapBallotRequest(ballotRow, ballotRequestRes.error, week.id),
+    };
+  };
+
+  const cooking = scopeForRow(cookingRow);
+  const planning = openWeeks.planning ? scopeForRow(openWeeks.planning.row) : null;
+  const { week, meals, votes, recipes, shoppingList } = cooking;
 
   const snapshot: HouseholdSnapshot = {
     household: {
@@ -342,6 +395,7 @@ export async function fetchSupabaseSnapshot(
     votes,
     recipes,
     shoppingList,
+    planning,
     pendingInvites: (invitesRes.data ?? []).map(
       (row): PendingInvite => ({
         id: row.id,
@@ -352,7 +406,7 @@ export async function fetchSupabaseSnapshot(
       }),
     ),
     joinToken: joinTokenRes.error ? null : (joinTokenRes.data?.token ?? null),
-    ballotRequest: mapBallotRequest(ballotRequestRes.data, ballotRequestRes.error, week.id),
+    ballotRequest: cooking.ballotRequest,
     mealHistory: parseMealHistory(historyRes.error ? null : historyRes.data),
     savedMeals: parseSavedMeals(savedMealsRes.error ? null : savedMealsRes.data),
   };
@@ -464,8 +518,8 @@ export async function supabaseProposeReplacement(
   }
 }
 
-export async function supabaseLockWeek(client: SupabaseClient) {
-  const { error } = await client.rpc("lock_current_week");
+export async function supabaseLockWeek(client: SupabaseClient, weekId: string) {
+  const { error } = await client.rpc("lock_week", { target_week: weekId });
   if (error) throw new Error(error.message);
 }
 
@@ -692,10 +746,19 @@ export async function supabaseCreateJoinToken(client: SupabaseClient, rotate = f
   return data;
 }
 
-export async function supabaseRequestWeekBallot(client: SupabaseClient) {
-  const { data, error } = await client.rpc("request_week_ballot");
+export async function supabaseRequestWeekBallot(client: SupabaseClient, startsOn?: string) {
+  const { data, error } = startsOn
+    ? await client.rpc("request_week_ballot", { target_starts: startsOn })
+    : await client.rpc("request_week_ballot");
   if (error) throw new Error(error.message);
   if (typeof data !== "string" || !data) throw new Error("Could not create this week's meals request.");
+  return data;
+}
+
+export async function supabasePlanNextWeek(client: SupabaseClient) {
+  const { data, error } = await client.rpc("plan_next_week");
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !data) throw new Error("Could not plan next week.");
   return data;
 }
 
@@ -752,28 +815,15 @@ export async function supabaseRemoveSavedMeal(
 export async function supabaseRequestSavedMeal(
   client: SupabaseClient,
   session: Session,
-  input: { recipeKey: string; requestedForWeek: string; currentWeekStartsOn: string },
+  recipeKey: string,
 ): Promise<"requested" | "already"> {
   requireVoter(session);
-  const recipeKey = input.recipeKey.trim();
-  const { data, error } = await client
-    .from("saved_meals")
-    .select("recipe_key, requested_for_week")
-    .eq("household_id", session.householdId)
-    .eq("recipe_key", recipeKey)
-    .maybeSingle();
+  const key = recipeKey.trim();
+  const { data, error } = await client.rpc("request_saved_for_planning", { recipe_key: key });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("That saved meal is gone.");
-  const requestedForWeek =
-    typeof data.requested_for_week === "string" ? data.requested_for_week.slice(0, 10) : null;
-  if (savedMealRequestActive({ requestedForWeek }, input.currentWeekStartsOn)) return "already";
-  const { error: updateError } = await client
-    .from("saved_meals")
-    .update({ requested_for_week: input.requestedForWeek })
-    .eq("household_id", session.householdId)
-    .eq("recipe_key", recipeKey);
-  if (updateError) throw new Error(updateError.message);
-  return "requested";
+  if (data === "already") return "already";
+  if (data === "requested") return "requested";
+  throw new Error("Could not request that meal.");
 }
 
 export type BotCheckStatusResult =
@@ -781,7 +831,7 @@ export type BotCheckStatusResult =
   | { ok: false; error: "unauthorized" | "no_household" };
 
 const BOT_STATUS_HOUSEHOLD_COLUMNS =
-  "bot_check_mode, bot_check_interval_hours, setup_step, household_size, night_headcounts, couple_nights, family_size, couple_size";
+  "bot_check_mode, bot_check_interval_hours, setup_step, household_size, night_headcounts, couple_nights, family_size, couple_size, timezone, week_starts_on";
 
 function asRole(value: unknown): Role | null {
   switch (value) {
@@ -882,15 +932,31 @@ export async function supabaseCurrentWeekLocked(
   client: SupabaseClient,
   householdId: string,
 ): Promise<boolean> {
-  const { data, error } = await client
-    .from("weeks")
-    .select("status")
-    .eq("household_id", householdId)
-    .order("starts_on", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.status === "locked";
+  const [weeksRes, householdRes] = await Promise.all([
+    client
+      .from("weeks")
+      .select("id, status, starts_on")
+      .eq("household_id", householdId)
+      .order("starts_on", { ascending: false })
+      .limit(8),
+    client.from("households").select("timezone, week_starts_on").eq("id", householdId).maybeSingle(),
+  ]);
+  if (weeksRes.error) throw new Error(weeksRes.error.message);
+  if (householdRes.error) throw new Error(householdRes.error.message);
+  const today = todayInTimeZone(new Date(), String(householdRes.data?.timezone ?? ""));
+  const split = splitOpenWeeks(
+    rowsOf(weeksRes.data).flatMap((row) => {
+      const status = asWeekStatus(row.status);
+      if (!row.id || !status) return [];
+      return [{
+        status,
+        startsOn: typeof row.starts_on === "string" ? row.starts_on.slice(0, 10) : null,
+      }];
+    }),
+    today,
+    Number(householdRes.data?.week_starts_on) || 0,
+  );
+  return split.cooking?.status === "locked" || split.planning?.status === "locked";
 }
 
 /** Quiet-wake read. Recipe and shopping rows load only after the week is locked. */
@@ -918,66 +984,107 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
     throw new Error(householdError?.message ?? "Household not found");
   }
 
-  const { data: week, error: weekError } = await client
+  const { data: weekData, error: weekError } = await client
     .from("weeks")
-    .select("id, status")
+    .select("id, status, starts_on")
     .eq("household_id", householdId)
     .order("starts_on", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(8);
   if (weekError) throw new Error(weekError.message);
 
-  let ballot: {
-    status: NonNullable<ReturnType<typeof parseBallotRequestStatus>>;
-    householdSize: number;
-    nightHeadcounts: number[];
-  } | null = null;
-  let meals: BotCheckMeal[] = [];
-  let votes: Vote[] = [];
-  let members: Membership[] = [];
-  let recipes: Recipe[] = [];
-  let shoppingList: { items: readonly unknown[] } | null = null;
-  const weekStatus = asWeekStatus(week?.status);
+  const today = todayInTimeZone(new Date(), String(householdRow.timezone ?? ""));
+  const split = splitOpenWeeks(
+    rowsOf(weekData).flatMap((row) => {
+      if (!row?.id) return [];
+      return [{
+        id: String(row.id),
+        status: asWeekStatus(row.status) ?? "voting",
+        startsOn: typeof row.starts_on === "string" ? row.starts_on.slice(0, 10) : null,
+      }];
+    }),
+    today,
+    Number(householdRow.week_starts_on) || 0,
+  );
+  const openWeekRows = [split.cooking, split.planning].flatMap((week) => (week ? [week] : []));
 
-  if (week?.id) {
+  const botCheck = normalizeBotCheckSetting(
+    householdRow.bot_check_mode,
+    householdRow.bot_check_interval_hours,
+  );
+  const household = {
+    botCheckMode: botCheck.mode,
+    botCheckIntervalHours: botCheck.intervalHours,
+    setupStep: clampHouseSetupStep(householdRow.setup_step ?? 8),
+    householdSize: clampHouseholdSize(householdRow.household_size ?? householdRow.family_size),
+    nightHeadcounts: normalizeNightHeadcounts(householdRow.night_headcounts, {
+      coupleNights: householdRow.couple_nights,
+      familySize: householdRow.family_size,
+      coupleSize: householdRow.couple_size,
+    }),
+    coupleNights: Array.isArray(householdRow.couple_nights) ? householdRow.couple_nights : [],
+    familySize: Number(householdRow.family_size) || 4,
+    coupleSize: Number(householdRow.couple_size) || 2,
+  };
+
+  if (!openWeekRows.length) {
+    return {
+      ok: true,
+      body: botCheckForSnapshot({
+        household,
+        meals: [],
+        votes: [],
+        memberships: [],
+      }),
+    };
+  }
+
+  const statuses = [];
+  for (const openWeek of openWeekRows) {
     const [ballotRes, mealsRes] = await Promise.all([
       client
         .from("ballot_requests")
         .select("status, household_size, night_headcounts")
         .eq("household_id", householdId)
-        .eq("week_id", week.id)
+        .eq("week_id", openWeek.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
       client
         .from("meals")
-        .select("id, title, servings, night_date")
+        .select("id, title, servings, night_date, week_id")
         .eq("household_id", householdId)
-        .eq("week_id", week.id),
+        .eq("week_id", openWeek.id),
     ]);
     if (ballotRes.error) throw new Error(ballotRes.error.message);
     if (mealsRes.error) throw new Error(mealsRes.error.message);
 
-    const status = parseBallotRequestStatus(ballotRes.data?.status);
-    if (ballotRes.data && status) {
-      ballot = {
-        status,
-        householdSize: clampHouseholdSize(ballotRes.data.household_size),
-        nightHeadcounts: normalizeNightHeadcounts(
-          Array.isArray(ballotRes.data.night_headcounts)
-            ? (ballotRes.data.night_headcounts as number[])
-            : null,
-        ),
-      };
-    }
+    const ballotStatus = parseBallotRequestStatus(ballotRes.data?.status);
+    const ballot =
+      ballotRes.data && ballotStatus
+        ? {
+            status: ballotStatus,
+            householdSize: clampHouseholdSize(ballotRes.data.household_size),
+            nightHeadcounts: normalizeNightHeadcounts(
+              Array.isArray(ballotRes.data.night_headcounts)
+                ? (ballotRes.data.night_headcounts as number[])
+                : null,
+            ),
+          }
+        : null;
 
-    meals = (mealsRes.data ?? []).map((row) => ({
-      id: String(row.id),
-      title: String(row.title ?? ""),
-      servings: Number(row.servings),
-      nightDate: String(row.night_date),
-    }));
+    const sole = openWeekRows.length === 1;
+    const meals: BotCheckMeal[] = rowsOf(mealsRes.data).flatMap((row) => {
+      if (!sole && row.week_id != null && String(row.week_id) !== openWeek.id) return [];
+      return [{
+        id: String(row.id),
+        title: String(row.title ?? ""),
+        servings: Number(row.servings),
+        nightDate: String(row.night_date),
+      }];
+    });
 
+    let votes: Vote[] = [];
+    let members: Membership[] = [];
     if (meals.length) {
       const mealIds = meals.map((meal) => meal.id);
       const [votesRes, membersRes] = await Promise.all([
@@ -990,78 +1097,59 @@ export async function supabaseBotCheckStatus(client: SupabaseClient): Promise<Bo
       ]);
       if (votesRes.error) throw new Error(votesRes.error.message);
       if (membersRes.error) throw new Error(membersRes.error.message);
-      members = (membersRes.data ?? []).flatMap((row) => {
+      members = rowsOf(membersRes.data).flatMap((row) => {
         const role = asRole(row.role);
         if (!role) return [];
-        return [
-          {
-            id: String(row.id),
-            householdId,
-            userId: "",
-            role,
-            displayName: "",
-            email: "",
-          },
-        ];
+        return [{
+          id: String(row.id),
+          householdId,
+          userId: "",
+          role,
+          displayName: "",
+          email: "",
+        }];
       });
-      votes = (votesRes.data ?? []).flatMap((row) => {
+      votes = rowsOf(votesRes.data).flatMap((row) => {
         const choice = migrateVoteChoice(row.choice);
         if (!choice) return [];
-        return [
-          {
-            id: String(row.id),
-            householdId,
-            mealId: String(row.meal_id),
-            membershipId: String(row.membership_id),
-            choice,
-            note: "",
-            updatedAt: String(row.updated_at ?? ""),
-          },
-        ];
+        return [{
+          id: String(row.id),
+          householdId,
+          mealId: String(row.meal_id),
+          membershipId: String(row.membership_id),
+          choice,
+          note: "",
+          updatedAt: String(row.updated_at ?? ""),
+        }];
       });
     }
 
-    if (weekStatus === "locked" && meals.length) {
+    let recipes: Recipe[] = [];
+    let shoppingList: { items: readonly unknown[] } | null = null;
+    if (openWeek.status === "locked" && meals.length) {
       const fill = await loadLockedWeekFill(
         client,
         householdId,
-        String(week.id),
+        openWeek.id,
         meals.map((meal) => meal.id),
       );
       recipes = fill.recipes;
       shoppingList = fill.shoppingList;
     }
+
+    statuses.push(
+      botCheckForSnapshot({
+        household,
+        meals,
+        votes,
+        memberships: members,
+        ballotRequest: ballot,
+        week: { status: openWeek.status },
+        recipes,
+        shoppingList,
+      }),
+    );
   }
 
-  const botCheck = normalizeBotCheckSetting(
-    householdRow.bot_check_mode,
-    householdRow.bot_check_interval_hours,
-  );
-
-  return {
-    ok: true,
-    body: botCheckForSnapshot({
-      household: {
-        botCheckMode: botCheck.mode,
-        botCheckIntervalHours: botCheck.intervalHours,
-        setupStep: clampHouseSetupStep(householdRow.setup_step ?? 8),
-        householdSize: clampHouseholdSize(householdRow.household_size ?? householdRow.family_size),
-        nightHeadcounts: normalizeNightHeadcounts(householdRow.night_headcounts, {
-          coupleNights: householdRow.couple_nights,
-          familySize: householdRow.family_size,
-          coupleSize: householdRow.couple_size,
-        }),
-        coupleNights: Array.isArray(householdRow.couple_nights) ? householdRow.couple_nights : [],
-        familySize: Number(householdRow.family_size) || 4,
-        coupleSize: Number(householdRow.couple_size) || 2,
-      },
-      meals,
-      votes,
-      memberships: members,
-      ballotRequest: ballot,
-      week: weekStatus ? { status: weekStatus } : undefined,
-      recipes,
-      shoppingList,
-    }),
-  };
+  return { ok: true, body: preferBotCheckStatus(statuses) };
 }

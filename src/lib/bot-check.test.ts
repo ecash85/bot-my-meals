@@ -26,6 +26,7 @@ import {
   botCheckWrite,
   botCheckForSnapshot,
   deriveBotCheckStatus,
+  preferBotCheckStatus,
   fixedWaitingCadenceLine,
   normalizeBotCheckSetting,
   waitingCadenceLine,
@@ -81,6 +82,37 @@ describe("bot check cadence defaults", () => {
     expect(normalizeBotCheckSetting("fixed", 3)).toEqual({ mode: "fixed", intervalHours: 3 });
     expect(normalizeBotCheckSetting("fixed", "1")).toEqual({ mode: "fixed", intervalHours: 1 });
     expect(normalizeBotCheckSetting("fixed", 2)).toEqual({ mode: "adaptive", intervalHours: null });
+  });
+
+  it("prefers pending work on a planning week over a settled cooking week", () => {
+    const idle = deriveBotCheckStatus({
+      mode: "adaptive",
+      intervalHours: null,
+      setupComplete: true,
+      ballotStatus: "fulfilled",
+      ballotHouseholdSize: 4,
+      ballotNightHeadcounts: PLATES,
+      householdSize: 4,
+      nightHeadcounts: PLATES,
+      meals: [],
+    });
+    const pending = deriveBotCheckStatus({
+      mode: "adaptive",
+      intervalHours: null,
+      setupComplete: true,
+      ballotStatus: "pending",
+      ballotHouseholdSize: 4,
+      ballotNightHeadcounts: PLATES,
+      householdSize: 4,
+      nightHeadcounts: PLATES,
+      meals: [],
+    });
+    expect(idle.needs_work).toBe(false);
+    expect(preferBotCheckStatus([idle, pending])).toMatchObject({
+      needs_work: true,
+      reason: "pending_ballot",
+      cadence: { interval_hours: 1, phase: "active" },
+    });
   });
 
   it("uses 1h while adaptive work or setup is open, and 6h when the week is settled", () => {
@@ -326,7 +358,7 @@ describe("Settings and Waiting copy lock", () => {
     expect(BOT_CHECK_HELPER).toBe("How often Bot My Meals looks for updates from your Bot.");
     expect(BOT_CHECK_ADAPTIVE_LABEL).toBe("Adaptive (recommended)");
     expect(BOT_CHECK_ADAPTIVE_SUB).toBe(
-      "Every hour while you\u2019re setting up or waiting; every 6 hours when the week is settled.",
+      "Every hour while you\u2019re setting up or waiting; every 6 hours when nothing is waiting.",
     );
     expect(BOT_CHECK_EVERY_HOUR).toBe("Every hour");
     expect(BOT_CHECK_EVERY_3_HOURS).toBe("Every 3 hours");
@@ -364,7 +396,7 @@ describe("Settings and Waiting copy lock", () => {
     );
     expect(settingsHtml).toContain("Bot check frequency");
     expect(settingsHtml).toContain("Adaptive (recommended)");
-    expect(settingsHtml).toContain("Every hour while you\u2019re setting up or waiting; every 6 hours when the week is settled.");
+    expect(settingsHtml).toContain("Every hour while you\u2019re setting up or waiting; every 6 hours when nothing is waiting.");
     expect(settingsHtml).toContain("Every hour");
     expect(settingsHtml).toContain("Every 3 hours");
     expect(settingsHtml).toContain("Every 6 hours");

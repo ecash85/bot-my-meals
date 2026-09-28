@@ -1,4 +1,6 @@
 import type { WeekNightPresentation } from "./ballot";
+import { POST_LOCK_GET_RECIPES_WAKE_HINT, RECIPE_PENDING_WAKE_HINT } from "./bot-wake";
+import type { WeekRole } from "./types";
 import {
   BOT_CHECK_WAITING_ADAPTIVE,
   effectiveIntervalHours,
@@ -27,6 +29,40 @@ export const RECIPE_PENDING_TITLE = "Waiting for your Bot";
 export const RECIPE_PENDING_BODY = "Your bot hasn\u2019t saved this recipe yet.";
 export const RECIPE_PENDING_HINT =
   "Message your Bot My Meals Grok Bot and ask it to fill recipes for this week.";
+
+export const POST_LOCK_GET_RECIPES_NEXT_HINT =
+  "Message your Bot My Meals Grok Bot and ask it to fill recipes and the shopping list for next week. This isn\u2019t a push from the app.";
+export const POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT =
+  "Wakes your bot to fill recipes and the shopping list for next week.";
+export const RECIPE_PENDING_NEXT_HINT =
+  "Message your Bot My Meals Grok Bot and ask it to fill recipes for next week.";
+export const RECIPE_PENDING_NEXT_WAKE_HINT = "Wakes your bot to fill this recipe for next week.";
+
+export function getRecipesHint(role: WeekRole, wake: boolean): string {
+  switch (role) {
+    case "cooking":
+      return wake ? POST_LOCK_GET_RECIPES_WAKE_HINT : POST_LOCK_GET_RECIPES_HINT;
+    case "planning":
+      return wake ? POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT : POST_LOCK_GET_RECIPES_NEXT_HINT;
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
+}
+
+export function recipePendingHint(role: WeekRole, wake: boolean): string {
+  switch (role) {
+    case "cooking":
+      return wake ? RECIPE_PENDING_WAKE_HINT : RECIPE_PENDING_HINT;
+    case "planning":
+      return wake ? RECIPE_PENDING_NEXT_WAKE_HINT : RECIPE_PENDING_NEXT_HINT;
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
+}
 
 export type PendingBotFillInput = {
   weekStatus: WeekStatus;

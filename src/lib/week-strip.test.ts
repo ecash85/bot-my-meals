@@ -105,7 +105,7 @@ describe("This week strip", () => {
     expect(strip).toContain("font-medium");
     expect(strip).toContain('type="button"');
     expect(week).toContain("nightHasStripMeal");
-    expect(week).toContain("startsOn={snapshot.week.startsOn}");
+    expect(week).toContain("startsOn={scope.week.startsOn}");
     expect(strip).not.toContain("<Lock");
     expect(strip).not.toContain("lucide-react");
     expect(strip).not.toContain("href=");

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { BallotToast } from "@/components/ballot-toast";
-import { botCheckForSnapshot } from "@/lib/bot-check";
+import { botCheckForHousehold } from "@/lib/bot-check";
 import { shouldWakeNeedsWork } from "@/lib/bot-wake";
 import { requestBotWake } from "@/lib/bot-wake-client";
 import { storeSlugForAdd } from "@/lib/grocers";
@@ -31,7 +31,8 @@ import {
   type PendingOptimistic,
 } from "@/lib/optimistic";
 import { getPublicSupabaseConfig, isSupabaseConfigured } from "@/lib/config";
-import { mealRecipeKey, nextWeekStartsOn, savedMealForKey, savedMealRequestActive } from "@/lib/saved-meals";
+import { mealRecipeKey, savedMealForKey, savedMealRequestActive } from "@/lib/saved-meals";
+import { planningTargetStarts, scopeForMeal, scopeForRole } from "@/lib/open-weeks";
 import { PASSWORD_MIN_LENGTH, passwordResetRedirectUrl } from "@/lib/login";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -44,6 +45,7 @@ import {
   supabaseJoinByCode,
   supabaseLockWeek,
   supabasePeekJoinToken,
+  supabasePlanNextWeek,
   supabaseProposeReplacement,
   supabaseRemoveInvite,
   supabaseRemoveMember,
@@ -67,6 +69,7 @@ import type {
   Session,
   ShoppingPrompt,
   VoteChoice,
+  WeekRole,
 } from "@/lib/types";
 import type { MemberDraft } from "@/lib/users";
 
@@ -88,6 +91,8 @@ type SupperContextValue = {
   mode: "setup" | "supabase";
   session: Session | null;
   snapshot: HouseholdSnapshot | null;
+  viewedRole: WeekRole;
+  setViewedRole: (role: WeekRole) => void;
   error: string | null;
   refresh: () => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
@@ -120,7 +125,8 @@ type SupperContextValue = {
   peekJoinToken: (token: string) => Promise<JoinPeek>;
   claimJoinToken: (token: string) => Promise<void>;
   createJoinToken: (rotate?: boolean) => Promise<string>;
-  requestWeekBallot: () => Promise<string>;
+  requestWeekBallot: (startsOn?: string) => Promise<string>;
+  planNextWeek: () => Promise<string>;
   toggleSavedMeal: (mealId: string) => Promise<"saved" | "removed">;
   removeSavedMeal: (recipeKey: string) => Promise<void>;
   requestSavedMeal: (recipeKey: string) => Promise<"requested" | "already">;
@@ -144,6 +150,8 @@ function createSetupContext(): SupperContextValue {
     mode: "setup",
     session: null,
     snapshot: null,
+    viewedRole: "cooking",
+    setViewedRole: () => undefined,
     error: null,
     refresh: async () => {},
     signUpWithPassword: async () => setupUnavailable(),
@@ -173,6 +181,7 @@ function createSetupContext(): SupperContextValue {
     claimJoinToken: async () => setupUnavailable(),
     createJoinToken: async () => setupUnavailable(),
     requestWeekBallot: async () => setupUnavailable(),
+    planNextWeek: async () => setupUnavailable(),
     toggleSavedMeal: async () => setupUnavailable(),
     removeSavedMeal: async () => setupUnavailable(),
     requestSavedMeal: async () => setupUnavailable(),
@@ -192,6 +201,8 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot | null>(null);
+  const [viewedRole, setViewedRoleState] = useState<WeekRole>("cooking");
+  const viewedRoleRef = useRef<WeekRole>("cooking");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const baseRef = useRef<HouseholdSnapshot | null>(null);
@@ -250,6 +261,11 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
   }, [publish]);
 
   const dismissNotice = useCallback(() => setNotice(null), []);
+
+  const setViewedRole = useCallback((role: WeekRole) => {
+    viewedRoleRef.current = role;
+    setViewedRoleState(role);
+  }, []);
 
   const run = async <T,>(fn: () => Promise<T> | T): Promise<T> => {
     setError(null);
@@ -368,7 +384,7 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       needsWorkRef.current = null;
       return;
     }
-    const needs = botCheckForSnapshot(snapshot).needs_work;
+    const needs = botCheckForHousehold(snapshot).needs_work;
     const previous = needsWorkRef.current;
     needsWorkRef.current = needs;
     if (shouldWakeNeedsWork(previous, needs)) {
@@ -382,6 +398,8 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       mode: "supabase",
       session,
       snapshot,
+      viewedRole,
+      setViewedRole,
       error,
       refresh,
       bootstrapHousehold: (input) =>
@@ -577,23 +595,29 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       lockWeek: () =>
         run(async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session || !snapshot) throw new Error("Not signed in");
-          await supabaseLockWeek(client);
+          const visible = displayRef.current;
+          if (!client || !session || !visible) throw new Error("Not signed in");
+          await supabaseLockWeek(client, scopeForRole(visible, viewedRoleRef.current).week.id);
           void requestBotWake("week_locked");
         }),
       unlockWeek: () =>
         run(async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !session || !snapshot) throw new Error("Not signed in");
-          const editableFrom = todayInTimeZone(new Date(), snapshot.household.timezone);
-          await supabaseUnlockWeek(client, session, snapshot.week.id, editableFrom);
+          const visible = displayRef.current;
+          if (!client || !session || !visible) throw new Error("Not signed in");
+          const editableFrom = todayInTimeZone(new Date(), visible.household.timezone);
+          const weekId = scopeForRole(visible, viewedRoleRef.current).week.id;
+          await supabaseUnlockWeek(client, session, weekId, editableFrom);
         }),
-      closeShoppingPrompt: (prompt) =>
-        runOptimistic("shopping-prompt", (snap) => patchShoppingPrompt(snap, prompt), async () => {
+      closeShoppingPrompt: (prompt) => {
+        const visible = displayRef.current;
+        const weekId = visible ? scopeForRole(visible, viewedRoleRef.current).week.id : "";
+        return runOptimistic("shopping-prompt", (snap) => patchShoppingPrompt(snap, prompt, weekId), async () => {
           const client = createSupabaseBrowserClient();
-          if (!client || !snapshot) throw new Error("Not signed in");
-          await supabaseSetShoppingPrompt(client, snapshot.week.id, prompt);
-        }),
+          if (!client || !weekId) throw new Error("Not signed in");
+          await supabaseSetShoppingPrompt(client, weekId, prompt);
+        });
+      },
       toggleItem: (itemId, checked) =>
         runOptimistic(`item:${itemId}`, (snap) => patchItemChecked(snap, itemId, checked), async () => {
           const client = createSupabaseBrowserClient();
@@ -689,11 +713,19 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client) throw new Error("Not signed in");
           return supabaseCreateJoinToken(client, rotate === true);
         }),
-      requestWeekBallot: () =>
+      requestWeekBallot: (startsOn?: string) =>
         run(async () => {
           const client = createSupabaseBrowserClient();
           if (!client) throw new Error("Not signed in");
-          return supabaseRequestWeekBallot(client);
+          return supabaseRequestWeekBallot(client, startsOn);
+        }),
+      planNextWeek: () =>
+        run(async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client) throw new Error("Not signed in");
+          const id = await supabasePlanNextWeek(client);
+          setViewedRole("planning");
+          return id;
         }),
       toggleSavedMeal: (mealId) => {
         const current = session;
@@ -703,13 +735,14 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
             throw new Error("Not signed in");
           });
         }
-        const meal = visible.meals.find((item) => item.id === mealId);
-        if (!meal) {
+        const located = scopeForMeal(visible, mealId);
+        const meal = located?.scope.meals.find((item) => item.id === mealId);
+        if (!meal || !located) {
           return run(async () => {
             throw new Error("That night is not on this week.");
           });
         }
-        const recipe = visible.recipes.find((item) => item.mealId === meal.id);
+        const recipe = located.scope.recipes.find((item) => item.mealId === meal.id);
         const recipeKey = mealRecipeKey({ title: meal.title, recipeKey: recipe?.recipeKey });
         const existing = savedMealForKey(visible.savedMeals, recipeKey);
         if (existing) {
@@ -722,7 +755,7 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
         }
         const savedAt = new Date().toISOString();
         const lastLockedAt =
-          visible.week.status === "locked" ? visible.week.lockedAt ?? savedAt : null;
+          located.scope.week.status === "locked" ? located.scope.week.lockedAt ?? savedAt : null;
         return runOptimistic(
           `saved:${recipeKey}`,
           (snap) =>
@@ -771,28 +804,24 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
             throw new Error("That saved meal is gone.");
           });
         }
-        if (savedMealRequestActive(existing, visible.week.startsOn)) {
+        const requestedForWeek = planningTargetStarts(visible);
+        if (savedMealRequestActive(existing, requestedForWeek)) {
           return Promise.resolve("already" as const);
         }
-        const requestedForWeek = nextWeekStartsOn(visible.week.startsOn);
         return runOptimistic(
           `saved-request:${recipeKey}`,
           (snap) => patchSavedMealRequest(snap, recipeKey, requestedForWeek),
           async () => {
             const client = createSupabaseBrowserClient();
             if (!client) throw new Error("Not signed in");
-            return supabaseRequestSavedMeal(client, current, {
-              recipeKey,
-              requestedForWeek,
-              currentWeekStartsOn: visible.week.startsOn,
-            });
+            return supabaseRequestSavedMeal(client, current, recipeKey);
           },
         );
       },
     }),
     // refresh/run close over the latest session and snapshot on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, session, snapshot, error],
+    [ready, session, snapshot, viewedRole, setViewedRole, error],
   );
 
   return (

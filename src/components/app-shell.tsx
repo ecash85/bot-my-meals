@@ -20,6 +20,7 @@ export function AppShell({
   eyebrow,
   backHref,
   backLabel = "This week",
+  headerExtra,
   status,
   titleAside,
   footer,
@@ -30,6 +31,8 @@ export function AppShell({
   eyebrow?: string;
   backHref?: string;
   backLabel?: string;
+  /** Week switcher, under the wordmark. Replaces the lone title when both weeks are open. */
+  headerExtra?: ReactNode;
   status?: ReactNode;
   titleAside?: ReactNode;
   footer?: ReactNode;
@@ -61,13 +64,16 @@ export function AppShell({
       >
         <header className="px-5 pb-3 pt-2" data-slot="app-header">
           <BrandMark size="compact" />
+          {headerExtra}
+          {headerExtra ? <h1 className="sr-only">{title}</h1> : null}
           {backHref ? <ChromeBackLink href={backHref} label={backLabel} /> : null}
-          {eyebrow ? (
+          {headerExtra && titleAside ? <div className="mt-2">{titleAside}</div> : null}
+          {headerExtra ? null : eyebrow ? (
             <p className={cn("type-eyebrow", backHref ? "text-muted-foreground" : "mt-3 text-primary")}>
               {eyebrow}
             </p>
           ) : null}
-          {titleAside ? (
+          {headerExtra ? null : titleAside ? (
             <div
               className={cn(
                 "flex flex-wrap items-center gap-x-2 gap-y-1",

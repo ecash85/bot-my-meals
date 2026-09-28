@@ -3,16 +3,18 @@
 import { useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { useSupper } from "@/components/supper-provider";
+import { useViewedWeek } from "@/components/use-viewed-week";
 import { Button } from "@/components/ui/button";
 import { checkWeekLock } from "@/lib/lock";
 
 export function LockBar() {
   const { snapshot, lockWeek, error } = useSupper();
+  const { scope } = useViewedWeek();
   const [busy, setBusy] = useState(false);
-  if (!snapshot) return null;
+  if (!snapshot || !scope) return null;
 
-  const locked = snapshot.week.status === "locked";
-  const check = checkWeekLock(snapshot.meals, snapshot.votes, snapshot.memberships);
+  const locked = scope.week.status === "locked";
+  const check = checkWeekLock(scope.meals, scope.votes, snapshot.memberships);
   if (locked || !check.ready) return null;
 
   return (

@@ -7,16 +7,19 @@ import { LockFirstEmpty } from "@/components/lock-first-empty";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
+import { useViewedWeek } from "@/components/use-viewed-week";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
 import { formatWeekEyebrow, weekdayShortFromNight } from "@/lib/dates";
 import { todayInTimeZone } from "@/lib/meal-history";
 import { isNightOff } from "@/lib/lock";
 import {
   LOCK_FIRST_TITLE,
+  RECIPES_EMPTY_NEXT_WEEK,
   RECIPES_EMPTY_WEEK,
   RECIPES_NO_HOUSEHOLD,
   RECIPES_PRE_LOCK_DESCRIPTION,
 } from "@/lib/lock-success";
+import { weekHomeTitle } from "@/lib/open-weeks";
 import { isPendingBotFill } from "@/lib/post-lock-waiting";
 import { firstCookableMeal, recipeNightsForWeek } from "@/lib/recipes";
 import { cn } from "@/lib/utils";
@@ -31,7 +34,8 @@ export default function RecipesPage() {
 
 function RecipesBody() {
   const { snapshot } = useSupper();
-  if (!snapshot) {
+  const { role, scope } = useViewedWeek();
+  if (!snapshot || !scope) {
     return (
       <AppShell title="Recipes">
         <p className="type-body text-muted-foreground">{RECIPES_NO_HOUSEHOLD}</p>
@@ -39,29 +43,30 @@ function RecipesBody() {
     );
   }
 
-  const locked = snapshot.week.status === "locked";
+  const locked = scope.week.status === "locked";
+  const backLabel = weekHomeTitle(role);
   const pendingFill = isPendingBotFill({
-    weekStatus: snapshot.week.status,
-    meals: snapshot.meals,
-    votes: snapshot.votes,
+    weekStatus: scope.week.status,
+    meals: scope.meals,
+    votes: scope.votes,
     memberships: snapshot.memberships,
-    recipes: snapshot.recipes,
-    shoppingList: snapshot.shoppingList,
+    recipes: scope.recipes,
+    shoppingList: scope.shoppingList,
   });
-  const nights = recipeNightsForWeek(snapshot.meals);
+  const nights = recipeNightsForWeek(scope.meals);
   const removedMealIds = new Set(
-    nights.filter((meal) => isNightOff(meal.id, snapshot.votes)).map((meal) => meal.id),
+    nights.filter((meal) => isNightOff(meal.id, scope.votes)).map((meal) => meal.id),
   );
   const todayIso = todayInTimeZone(new Date(), snapshot.household.timezone);
-  const firstMeal = firstCookableMeal(nights, snapshot.votes, todayIso);
+  const firstMeal = firstCookableMeal(nights, scope.votes, todayIso);
 
   if (!locked) {
     return (
       <AppShell
         title="Recipes"
-        eyebrow={formatWeekEyebrow(snapshot.week.startsOn)}
+        eyebrow={formatWeekEyebrow(scope.week.startsOn)}
         backHref="/week"
-        backLabel="This week"
+        backLabel={backLabel}
       >
         <LockFirstEmpty
           title={LOCK_FIRST_TITLE}
@@ -77,13 +82,15 @@ function RecipesBody() {
     return (
       <AppShell
         title="Recipes"
-        eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
+        eyebrow={formatWeekEyebrow(scope.week.startsOn, true)}
         backHref="/week"
-        backLabel="This week"
+        backLabel={backLabel}
       >
         <PostLockWaitingCard
           mode={snapshot.household.botCheckMode}
           intervalHours={snapshot.household.botCheckIntervalHours}
+          weekRole={role}
+          startsOn={scope.week.startsOn}
         />
       </AppShell>
     );
@@ -93,13 +100,15 @@ function RecipesBody() {
     return (
       <AppShell
         title="Recipes"
-        eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
+        eyebrow={formatWeekEyebrow(scope.week.startsOn, true)}
         backHref="/week"
-        backLabel="This week"
+        backLabel={backLabel}
       >
         <div className="rounded-[14px] border border-dashed border-border bg-card p-5 shadow-card">
           <h2 className="type-section">No dinners yet</h2>
-          <p className="type-body mt-2 text-muted-foreground">{RECIPES_EMPTY_WEEK}</p>
+          <p className="type-body mt-2 text-muted-foreground">
+            {role === "planning" ? RECIPES_EMPTY_NEXT_WEEK : RECIPES_EMPTY_WEEK}
+          </p>
         </div>
       </AppShell>
     );
@@ -108,9 +117,9 @@ function RecipesBody() {
   return (
     <AppShell
       title="Recipes"
-      eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
+      eyebrow={formatWeekEyebrow(scope.week.startsOn, true)}
       backHref="/week"
-      backLabel="This week"
+      backLabel={backLabel}
       status={<StatusStrip state="locked" people={[]} />}
     >
       <div className="space-y-3">

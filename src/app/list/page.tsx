@@ -9,9 +9,11 @@ import { LockFirstEmpty } from "@/components/lock-first-empty";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
+import { useViewedWeek } from "@/components/use-viewed-week";
 import { Button } from "@/components/ui/button";
 import { useOptimisticValue } from "@/components/use-optimistic-value";
 import { formatWeekEyebrow } from "@/lib/dates";
+import { shoppingListTitle, weekHomeTitle } from "@/lib/open-weeks";
 import { isNightOff } from "@/lib/lock";
 import {
   DISMISS_SHOPPING_LABEL,
@@ -36,8 +38,9 @@ export default function ListPage() {
 
 function ListBody() {
   const { snapshot, toggleItem, closeShoppingPrompt } = useSupper();
+  const { role, scope } = useViewedWeek();
   const [pendingClose, setPendingClose] = useState<"done" | "dismissed" | null>(null);
-  if (!snapshot) {
+  if (!snapshot || !scope) {
     return (
       <AppShell title="Shopping list">
         <p className="type-body text-muted-foreground">{LIST_NO_HOUSEHOLD}</p>
@@ -45,23 +48,25 @@ function ListBody() {
     );
   }
 
-  const locked = snapshot.week.status === "locked";
+  const locked = scope.week.status === "locked";
+  const listTitle = shoppingListTitle(role);
+  const backLabel = weekHomeTitle(role);
   const pendingFill = isPendingBotFill({
-    weekStatus: snapshot.week.status,
-    meals: snapshot.meals,
-    votes: snapshot.votes,
+    weekStatus: scope.week.status,
+    meals: scope.meals,
+    votes: scope.votes,
     memberships: snapshot.memberships,
-    recipes: snapshot.recipes,
-    shoppingList: snapshot.shoppingList,
+    recipes: scope.recipes,
+    shoppingList: scope.shoppingList,
   });
-  const nights = recipeNightsForWeek(snapshot.meals);
+  const nights = recipeNightsForWeek(scope.meals);
   const removedMealIds = new Set(
-    nights.filter((meal) => isNightOff(meal.id, snapshot.votes)).map((meal) => meal.id),
+    nights.filter((meal) => isNightOff(meal.id, scope.votes)).map((meal) => meal.id),
   );
 
   if (!locked) {
     return (
-      <AppShell title="Shopping list" eyebrow={formatWeekEyebrow(snapshot.week.startsOn)}>
+      <AppShell title={listTitle} eyebrow={formatWeekEyebrow(scope.week.startsOn)} backHref="/week" backLabel={backLabel}>
         <LockFirstEmpty
           title={LOCK_FIRST_TITLE}
           description={LIST_PRE_LOCK_DESCRIPTION}
@@ -72,12 +77,14 @@ function ListBody() {
     );
   }
 
-  const list = snapshot.shoppingList;
+  const list = scope.shoppingList;
   if (pendingFill && (!list || list.items.length === 0)) {
     return (
-      <AppShell title="Shopping list" eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}>
+      <AppShell title={listTitle} eyebrow={formatWeekEyebrow(scope.week.startsOn, true)} backHref="/week" backLabel={backLabel}>
         <PostLockWaitingCard
           mode={snapshot.household.botCheckMode}
+          weekRole={role}
+          startsOn={scope.week.startsOn}
           intervalHours={snapshot.household.botCheckIntervalHours}
         />
       </AppShell>
@@ -86,7 +93,7 @@ function ListBody() {
 
   if (!list || list.items.length === 0) {
     return (
-      <AppShell title="Shopping list" eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}>
+      <AppShell title={listTitle} eyebrow={formatWeekEyebrow(scope.week.startsOn, true)} backHref="/week" backLabel={backLabel}>
         <div className="rounded-[14px] border border-dashed border-border bg-card p-5 shadow-card">
           <h2 className="type-section">Nothing to buy</h2>
           <p className="type-body mt-2 text-muted-foreground">{LIST_NOTHING_TO_BUY}</p>
@@ -99,8 +106,10 @@ function ListBody() {
 
   return (
     <AppShell
-      title="Shopping list"
-      eyebrow={formatWeekEyebrow(snapshot.week.startsOn, true)}
+      title={listTitle}
+      eyebrow={formatWeekEyebrow(scope.week.startsOn, true)}
+      backHref="/week"
+      backLabel={backLabel}
       status={<StatusStrip state="locked" people={[]} secondary={LIST_LOCKED_SECONDARY} />}
     >
       <div className="space-y-8">
@@ -132,7 +141,7 @@ function ListBody() {
           </section>
         ))}
       </div>
-      {snapshot.week.shoppingPrompt === "open" || pendingClose ? (
+      {scope.week.shoppingPrompt === "open" || pendingClose ? (
         <div data-slot="shopping-prompt-actions" className="mt-8 space-y-2">
           <Button
             type="button"

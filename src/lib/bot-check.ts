@@ -8,6 +8,7 @@ import type {
   BotCheckIntervalHours,
   BotCheckMode,
   Household,
+  HouseholdSnapshot,
   Meal,
   Membership,
   NightLifecycle,
@@ -34,7 +35,7 @@ export const BOT_CHECK_SECTION_LABEL = "Bot check frequency";
 export const BOT_CHECK_HELPER = "How often Bot My Meals looks for updates from your Bot.";
 export const BOT_CHECK_ADAPTIVE_LABEL = "Adaptive (recommended)";
 export const BOT_CHECK_ADAPTIVE_SUB =
-  "Every hour while you\u2019re setting up or waiting; every 6 hours when the week is settled.";
+  "Every hour while you\u2019re setting up or waiting; every 6 hours when nothing is waiting.";
 export const BOT_CHECK_EVERY_HOUR = "Every hour";
 export const BOT_CHECK_EVERY_3_HOURS = "Every 3 hours";
 export const BOT_CHECK_EVERY_6_HOURS = "Every 6 hours";
@@ -347,7 +348,7 @@ export function fixedWaitingCadenceLine(hours: BotCheckIntervalHours): string {
   }
 }
 
-/** Cadence line for Waiting. Null when the week is settled (idle). */
+/** Cadence line for Waiting. Null when nothing is waiting (idle). */
 export function waitingCadenceLine(
   status: BotCheckStatus,
   options?: { pendingWorkOnly?: boolean },
@@ -364,6 +365,52 @@ export function waitingCadenceLine(
       return _exhaustive;
     }
   }
+}
+
+/** Pending work on any open week wins. A settled cooking week does not hide a planning ballot. */
+export function preferBotCheckStatus(statuses: readonly BotCheckStatus[]): BotCheckStatus {
+  const list = statuses.filter((status) => status != null);
+  const first = list[0];
+  if (!first) {
+    throw new Error("No week to check.");
+  }
+  for (const reason of BOT_WORK_REASONS) {
+    if (!botWorkNeedsAction(reason)) continue;
+    const match = list.find((status) => status.reason === reason);
+    if (match) return match;
+  }
+  const setup = list.find((status) => status.reason === "setup_incomplete");
+  if (setup) return setup;
+  return first;
+}
+
+export function botCheckForHousehold(
+  snapshot: Pick<
+    HouseholdSnapshot,
+    | "household"
+    | "meals"
+    | "votes"
+    | "memberships"
+    | "ballotRequest"
+    | "week"
+    | "recipes"
+    | "shoppingList"
+    | "planning"
+  >,
+): BotCheckStatus {
+  const cooking = botCheckForSnapshot(snapshot);
+  if (!snapshot.planning) return cooking;
+  const planning = botCheckForSnapshot({
+    household: snapshot.household,
+    meals: snapshot.planning.meals,
+    votes: snapshot.planning.votes,
+    memberships: snapshot.memberships,
+    ballotRequest: snapshot.planning.ballotRequest,
+    week: snapshot.planning.week,
+    recipes: snapshot.planning.recipes,
+    shoppingList: snapshot.planning.shoppingList,
+  });
+  return preferBotCheckStatus([cooking, planning]);
 }
 
 function mealFacts(

@@ -4,7 +4,7 @@ Household-shared pool. One row per dinner the house wants again. It is not a pri
 
 Cool-down is **21 days (3 weeks)** after `last_locked_at` — the last time that dinner was on a **locked** week — before a random ballot may suggest it again. Saving does not start the clock. **Request for next week** sets `requested_for_week` and bypasses cool-down for that week.
 
-The app does not invent a second waiting screen. Explicit requests ride the existing `ballot_requests` inbox (`saved_recipe_keys`) when that week’s ballot is pending or created. Until a week row exists, the request lives only on `saved_meals`.
+The app does not invent a second waiting screen. **Request for next week** always targets the planning week. If that row is missing, `request_saved_for_planning` creates it (one next week only) and queues a ballot for that `starts_on`. Cool-down is unchanged — Request still bypasses it. Explicit requests ride that week’s `ballot_requests` inbox (`saved_recipe_keys`). A request already aimed at the planning week shows **Requested** until it is consumed or the week advances.
 
 ## Table `public.saved_meals`
 
@@ -54,7 +54,7 @@ where household_id = $household
 
 The same split is `ballot_role` on `public.saved_meal_pool(target_starts date)` for a signed-in household member (`requested`, `pool`, or `cooldown`).
 
-When an Admin creates or refreshes this week’s meals, `request_week_ballot()` copies:
+When an Admin creates or refreshes a week’s meals, `request_week_ballot(target_starts)` copies keys for **that** week (this week when `target_starts` is omitted, next week when planning). `plan_next_week()` creates the planning row if needed, then queues its ballot. It will not open a week after next.
 
 - `ballot_requests.saved_recipe_keys` — `requested_for_week` equals that week’s `starts_on` (include these; cool-down does not apply)
 - `ballot_requests.saved_pool_keys` — saved meals with no outstanding request whose `last_locked_at` is null or at least 21 days ago (optional random sample, not a promise)

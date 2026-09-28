@@ -23,6 +23,8 @@ export const LIST_NOTHING_TO_BUY =
   "Every remaining night is leftovers or was removed. No prices were invented.";
 export const RECIPES_EMPTY_WEEK =
   "Ask your Bot My Meals to propose dinners on This week. Lock the week, then recipes will show here.";
+export const RECIPES_EMPTY_NEXT_WEEK =
+  "Ask your Bot My Meals to propose dinners on Next week. Lock the week, then recipes will show here.";
 
 export function lockSuccessRecipesCta(title?: string | null): string {
   return title ? `${LOCK_SUCCESS_RECIPES_CTA} · ${title}` : LOCK_SUCCESS_RECIPES_CTA;

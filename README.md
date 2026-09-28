@@ -2,7 +2,7 @@
 
 This week's dinners, agreed.
 
-Bot My Meals is a household dinner planner: one shared week of meal titles, voting adults you add yourself, and recipes plus a store-split shopping list only after the week locks. It is a phone-first installable PWA. The data model is household-scoped from day one so a later paid multi-household product does not require a rewrite.
+Bot My Meals is a household dinner planner: one cooking week of meal titles, plus one next week when you plan ahead. Voting adults you add yourself, and recipes plus a store-split shopping list for that week only after it locks. It is a phone-first installable PWA. The data model is household-scoped from day one so a later paid multi-household product does not require a rewrite.
 
 This is a public household PWA template (v1 for one family). There is no billing and no invented grocery prices. This README is the public setup guide.
 
@@ -117,7 +117,7 @@ The app needs **all nine** files under [`supabase/migrations/`](supabase/migrati
 
 Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create). File 9 stores Bot check frequency (`bot_check_mode` defaults to `adaptive`; fixed checks use `bot_check_interval_hours` of 1, 3, or 6).
 
-After those nine, run every later file in [`supabase/migrations/`](supabase/migrations/) in filename order. That includes meal history, store slugs, week chrome, and `supabase/migrations/20260928183000_saved_meals.sql` (household Saved meals). See [`docs/saved-meals.md`](docs/saved-meals.md).
+After those nine, run every later file in [`supabase/migrations/`](supabase/migrations/) in filename order. That includes meal history, store slugs, week chrome, `supabase/migrations/20260928183000_saved_meals.sql` (household Saved meals), and `supabase/migrations/20260928210000_planning_week.sql` (one cooking week plus one next week). See [`docs/saved-meals.md`](docs/saved-meals.md).
 
 ### 5. Auth: Email on, Confirm email OFF
 
@@ -198,7 +198,7 @@ Walk through house setup (no Seed / sample week). Progress is **Setup · step N 
 6. **Optional** weekly meal budget (or skip).
 7. Tap **Create this week's meals** — app writes a ballot request and shows **Waiting for your Bot…** until the ballot appears. **Copy paste for your Grok Bot** is DIY fallback only (collapsed).
 
-Bot checks are adaptive: about every hour while you’re setting up or waiting, and every 6 hours when the week is settled. **House → Bot check frequency** can set every hour, every 3 hours, or every 6 hours instead. That schedule is the fallback.
+Bot checks are adaptive: about every hour while you’re setting up or waiting, and every 6 hours when the week is settled. That check looks at this week and next week when both are open. **House → Bot check frequency** can set every hour, every 3 hours, or every 6 hours instead. That schedule is the fallback.
 
 Create a routine named exactly **Wake on app event** with a webhook trigger. On wake it syncs ballot / recipes / shopping list / setup from the app, and stays quiet if nothing changed. Copy **Webhook URL** (the panel may say **POST to**) and the **sender key** if the panel shows one. Paste them in **House → Wake your Bot**. DIY alternative: Worker secrets `BOT_WAKE_WEBHOOK_URL` and optional `BOT_WAKE_WEBHOOK_KEY`. Never `NEXT_PUBLIC_` for these. After save, the app does not show the full secret again. Without that URL, **Check now** still means message your Bot. See [`docs/bot-routines.md`](docs/bot-routines.md).
 

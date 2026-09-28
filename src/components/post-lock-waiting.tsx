@@ -5,20 +5,21 @@ import Link from "next/link";
 import { BallotToast } from "@/components/ballot-toast";
 import { useBotWakeConfigured, useWakeNow } from "@/components/use-bot-wake";
 import { Button } from "@/components/ui/button";
-import { POST_LOCK_GET_RECIPES_WAKE_HINT, RECIPE_PENDING_WAKE_HINT } from "@/lib/bot-wake";
 import type { WakeClientResult } from "@/lib/bot-wake-client";
+import { waitingWeekCue } from "@/lib/open-weeks";
 import {
   POST_LOCK_BOT_CHECK_SETTINGS,
-  POST_LOCK_GET_RECIPES_HINT,
   POST_LOCK_GET_RECIPES_LABEL,
   POST_LOCK_WAITING_BODY,
   POST_LOCK_WAITING_TITLE,
   RECIPE_PENDING_BODY,
-  RECIPE_PENDING_HINT,
   RECIPE_PENDING_TITLE,
+  getRecipesHint,
   postLockWaitingCadenceLine,
+  recipePendingHint,
   type LockedDinnerTap,
 } from "@/lib/post-lock-waiting";
+import type { WeekRole } from "@/lib/types";
 import type { BotCheckIntervalHours, BotCheckMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -47,6 +48,8 @@ export function PostLockWaitingDetails({
   showBody = true,
   wakeConfigured,
   onGetRecipes,
+  weekRole = "cooking",
+  startsOn,
   className,
 }: {
   mode: BotCheckMode;
@@ -56,13 +59,16 @@ export function PostLockWaitingDetails({
   showBody?: boolean;
   wakeConfigured?: boolean;
   onGetRecipes?: () => void | Promise<WakeClientResult | void>;
+  weekRole?: WeekRole;
+  startsOn?: string;
   className?: string;
 }) {
   const now = useCadenceNow(lastCheckedAt);
   const cadence = postLockWaitingCadenceLine({ mode, intervalHours, lastCheckedAt, now });
   const configured = useBotWakeConfigured(wakeConfigured);
   const { busy, message, dismiss, wake } = useWakeNow(onGetRecipes);
-  const hint = configured ? POST_LOCK_GET_RECIPES_WAKE_HINT : POST_LOCK_GET_RECIPES_HINT;
+  const hint = getRecipesHint(weekRole, configured);
+  const cue = startsOn ? waitingWeekCue(weekRole, startsOn) : null;
 
   return (
     <div className={className}>
@@ -70,6 +76,11 @@ export function PostLockWaitingDetails({
         <h2 data-slot="post-lock-waiting-title" className="type-section text-primary">
           {POST_LOCK_WAITING_TITLE}
         </h2>
+      ) : null}
+      {cue ? (
+        <p data-slot="waiting-week-cue" className="type-meta mt-1 text-foreground">
+          {cue}
+        </p>
       ) : null}
       {showBody ? (
         <p className={cn("type-body text-muted-foreground", showTitle && "mt-2")}>{POST_LOCK_WAITING_BODY}</p>
@@ -112,12 +123,16 @@ export function PostLockWaitingCard({
   intervalHours,
   lastCheckedAt = null,
   wakeConfigured,
+  weekRole = "cooking",
+  startsOn,
   className,
 }: {
   mode: BotCheckMode;
   intervalHours: BotCheckIntervalHours | null;
   lastCheckedAt?: string | null;
   wakeConfigured?: boolean;
+  weekRole?: WeekRole;
+  startsOn?: string;
   className?: string;
 }) {
   return (
@@ -130,6 +145,8 @@ export function PostLockWaitingCard({
         intervalHours={intervalHours}
         lastCheckedAt={lastCheckedAt}
         wakeConfigured={wakeConfigured}
+        weekRole={weekRole}
+        startsOn={startsOn}
       />
     </div>
   );
@@ -142,6 +159,8 @@ export function PostLockWaitingSheet({
   intervalHours,
   lastCheckedAt = null,
   wakeConfigured,
+  weekRole = "cooking",
+  startsOn,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -149,6 +168,8 @@ export function PostLockWaitingSheet({
   intervalHours: BotCheckIntervalHours | null;
   lastCheckedAt?: string | null;
   wakeConfigured?: boolean;
+  weekRole?: WeekRole;
+  startsOn?: string;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -164,6 +185,8 @@ export function PostLockWaitingSheet({
           showTitle={false}
           showBody={false}
           wakeConfigured={wakeConfigured}
+          weekRole={weekRole}
+          startsOn={startsOn}
           className="px-4 pb-2"
         />
       </SheetContent>
@@ -174,13 +197,15 @@ export function PostLockWaitingSheet({
 export function RecipePendingNotice({
   wakeConfigured,
   onWake,
+  weekRole = "cooking",
 }: {
   wakeConfigured?: boolean;
   onWake?: () => void | Promise<WakeClientResult | void>;
+  weekRole?: WeekRole;
 }) {
   const configured = useBotWakeConfigured(wakeConfigured);
   const { busy, message, dismiss, wake } = useWakeNow(onWake);
-  const hint = configured ? RECIPE_PENDING_WAKE_HINT : RECIPE_PENDING_HINT;
+  const hint = recipePendingHint(weekRole, configured);
 
   return (
     <div data-slot="recipe-pending" data-wake={configured ? "on" : "off"} className="rounded-[14px] bg-card p-5 shadow-card">

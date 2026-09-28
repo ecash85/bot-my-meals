@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { BallotToast } from "@/components/ballot-toast";
@@ -16,6 +16,7 @@ import { formatNightDate, weekdayLabelFromNight } from "@/lib/dates";
 import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
+import { scopeForMeal, weekHomeTitle } from "@/lib/open-weeks";
 import { nightShowsRecipePending } from "@/lib/post-lock-waiting";
 import { SAVE_TOAST, UNSAVE_TOAST, mealRecipeKey, mealSaveAvailability, savedMealForKey } from "@/lib/saved-meals";
 import { nightStaysLocked } from "@/lib/week-chrome";
@@ -32,61 +33,67 @@ export default function MealPage({ params }: { params: Promise<{ mealId: string 
 }
 
 function MealDetail({ mealId }: { mealId: string }) {
-  const { snapshot, session, setVote, applyIdea, markLeftovers, proposeReplacement, toggleSavedMeal } =
+  const { snapshot, session, setVote, applyIdea, markLeftovers, proposeReplacement, toggleSavedMeal, setViewedRole } =
     useSupper();
   const [note, setNote] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customPitch, setCustomPitch] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [toast, setToast] = useState<string | undefined>();
-  const meal = snapshot?.meals.find((item) => item.id === mealId);
+  const located = snapshot ? scopeForMeal(snapshot, mealId) : null;
+  const scope = located?.scope ?? null;
+  const weekRole = located?.role ?? "cooking";
+  const mealWeekRole = located?.role ?? null;
+  useEffect(() => {
+    if (mealWeekRole) setViewedRole(mealWeekRole);
+  }, [mealWeekRole, setViewedRole]);
+  const meal = scope?.meals.find((item) => item.id === mealId);
   const latest =
     meal && snapshot
-      ? latestVoteForMeal(snapshot.votes, meal.id, snapshot.memberships)
+      ? latestVoteForMeal(scope?.votes ?? [], meal.id, snapshot.memberships)
       : undefined;
-  const weekLocked = snapshot?.week.status === "locked";
+  const weekLocked = scope?.week.status === "locked";
   const pastLocked =
-    snapshot && meal
+    scope && meal
       ? nightStaysLocked({
-          weekStatus: snapshot.week.status,
+          weekStatus: scope.week.status,
           nightDate: meal.nightDate,
-          editableFrom: snapshot.week.editableFrom,
+          editableFrom: scope.week.editableFrom,
         }) && !weekLocked
       : false;
   const readOnly = weekLocked || pastLocked;
 
-  const leftoverSources = useMemo(
-    () => (snapshot && meal ? snapshot.meals.filter((item) => item.dayIndex < meal.dayIndex && !item.isLeftovers) : []),
-    [snapshot, meal],
-  );
-
-  if (!snapshot || !meal) {
+  if (!snapshot || !scope || !meal) {
     return (
-      <AppShell title="Night" backHref="/week" backLabel="This week">
+      <AppShell title="Night" backHref="/week" backLabel={weekHomeTitle(weekRole)}>
         <p className="type-body text-muted-foreground">That night is not on this week.</p>
       </AppShell>
     );
   }
 
+  const leftoverSources = scope.meals.filter(
+    (item) => item.dayIndex < meal.dayIndex && !item.isLeftovers,
+  );
+
   const weekday = weekdayLabelFromNight(meal.nightDate);
-  const skipped = isNightOff(meal.id, snapshot.votes, snapshot.memberships);
-  const recipe = snapshot.recipes.find((item) => item.mealId === meal.id);
+  const skipped = isNightOff(meal.id, scope.votes, snapshot.memberships);
+  const recipe = scope.recipes.find((item) => item.mealId === meal.id);
   const pendingRecipe = nightShowsRecipePending({
-    weekStatus: snapshot.week.status,
-    meals: snapshot.meals,
-    votes: snapshot.votes,
+    weekStatus: scope.week.status,
+    meals: scope.meals,
+    votes: scope.votes,
     memberships: snapshot.memberships,
-    recipes: snapshot.recipes,
-    shoppingList: snapshot.shoppingList,
+    recipes: scope.recipes,
+    shoppingList: scope.shoppingList,
     mealId: meal.id,
   });
   const voters = votingMembers(snapshot.memberships);
   const canAct = canActOnBallot(session?.role) && !readOnly;
   const saveAvailability = mealSaveAvailability({
     meal,
-    votes: snapshot.votes,
+    votes: scope.votes,
     memberships: snapshot.memberships,
-    recipes: snapshot.recipes,
+    recipes: scope.recipes,
   });
   const recipeKey = mealRecipeKey({ title: meal.title, recipeKey: recipe?.recipeKey });
   const saved = Boolean(savedMealForKey(snapshot.savedMeals, recipeKey));
@@ -122,7 +129,7 @@ function MealDetail({ mealId }: { mealId: string }) {
       title={skipped && readOnly ? EMPTY_DAY_TITLE : meal.title}
       eyebrow={`${weekday} · ${formatNightDate(meal.nightDate)}`}
       backHref="/week"
-      backLabel="This week"
+      backLabel={weekHomeTitle(weekRole)}
     >
       {weekLocked ? (
         skipped ? (
@@ -133,7 +140,7 @@ function MealDetail({ mealId }: { mealId: string }) {
           <>
             {saveControl}
             <div className="mt-4">
-              <RecipePendingNotice />
+              <RecipePendingNotice weekRole={weekRole} />
             </div>
           </>
         ) : (
@@ -159,7 +166,7 @@ function MealDetail({ mealId }: { mealId: string }) {
             <h2 className="type-section">Votes</h2>
             <ul className="mt-3 space-y-2">
               {voters.map((member) => {
-                const vote = voteFor(snapshot.votes, meal.id, member.id);
+                const vote = voteFor(scope.votes, meal.id, member.id);
                 const you = member.id === session?.membershipId;
                 return (
                   <li key={member.id} className="rounded-[14px] bg-secondary/70 px-4 py-3">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Lock } from "lucide-react";
 import { useSupper } from "@/components/supper-provider";
+import { useViewedWeek } from "@/components/use-viewed-week";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,9 +21,10 @@ import { isAdmin } from "@/lib/users";
 
 export function UnlockWeekControl({ variant }: { variant: "inline" | "block" }) {
   const { snapshot, session, unlockWeek } = useSupper();
+  const { scope } = useViewedWeek();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  if (!snapshot || snapshot.week.status !== "locked") return null;
+  if (!snapshot || !scope || scope.week.status !== "locked") return null;
 
   const admin = isAdmin(session?.role);
   if (variant === "block" && !admin) return null;

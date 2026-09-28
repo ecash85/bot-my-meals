@@ -17,6 +17,9 @@ export type NightLifecycle = (typeof NIGHT_LIFECYCLES)[number];
 export type Audience = "couple" | "family";
 export type WeekStatus = "voting" | "locked";
 
+/** Cooking is the calendar week you're in. Planning is the single next week, when it exists. */
+export type WeekRole = "cooking" | "planning";
+
 /** This week shopping row. `done` and `dismissed` keep it hidden after a re-lock. */
 export const SHOPPING_PROMPTS = ["open", "done", "dismissed"] as const;
 export type ShoppingPrompt = (typeof SHOPPING_PROMPTS)[number];
@@ -244,10 +247,21 @@ export type PendingInvite = {
   role: Role;
 };
 
+/** One open week's ballot, nights, recipes, and shopping list. */
+export type WeekScope = {
+  week: Week;
+  meals: Meal[];
+  votes: Vote[];
+  recipes: Recipe[];
+  shoppingList: ShoppingList | null;
+  ballotRequest: BallotRequest | null;
+};
+
 export type HouseholdSnapshot = {
   household: Household;
   memberships: Membership[];
   stores: Store[];
+  /** Cooking week. Home opens here. */
   week: Week;
   meals: Meal[];
   votes: Vote[];
@@ -256,6 +270,8 @@ export type HouseholdSnapshot = {
   pendingInvites?: PendingInvite[];
   joinToken?: string | null;
   ballotRequest?: BallotRequest | null;
+  /** The single next week, when that row exists. Absent means only cooking is open. */
+  planning?: WeekScope | null;
   mealHistory: MealHistoryWeek[];
   savedMeals: SavedMeal[];
 };
