@@ -6,6 +6,7 @@ import type {
   HouseholdSnapshot,
   MealProposalInput,
   Role,
+  SavedMeal,
   ShoppingPrompt,
   Vote,
   VoteChoice,
@@ -183,6 +184,31 @@ export function patchMemberRole(
     ...snapshot,
     memberships: snapshot.memberships.map((member) =>
       member.id === memberId ? { ...member, role } : member,
+    ),
+  };
+}
+
+export function patchSavedMealAdded(snapshot: HouseholdSnapshot, meal: SavedMeal): HouseholdSnapshot {
+  const savedMeals = snapshot.savedMeals.filter((item) => item.recipeKey !== meal.recipeKey);
+  return { ...snapshot, savedMeals: [meal, ...savedMeals] };
+}
+
+export function patchSavedMealRemoved(snapshot: HouseholdSnapshot, recipeKey: string): HouseholdSnapshot {
+  return {
+    ...snapshot,
+    savedMeals: snapshot.savedMeals.filter((meal) => meal.recipeKey !== recipeKey),
+  };
+}
+
+export function patchSavedMealRequest(
+  snapshot: HouseholdSnapshot,
+  recipeKey: string,
+  requestedForWeek: string,
+): HouseholdSnapshot {
+  return {
+    ...snapshot,
+    savedMeals: snapshot.savedMeals.map((meal) =>
+      meal.recipeKey === recipeKey ? { ...meal, requestedForWeek } : meal,
     ),
   };
 }

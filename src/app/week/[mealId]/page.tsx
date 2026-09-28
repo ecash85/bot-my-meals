@@ -3,8 +3,10 @@
 import { use, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
+import { BallotToast } from "@/components/ballot-toast";
 import { RecipePendingNotice } from "@/components/post-lock-waiting";
 import { RecipeBlock } from "@/components/recipe-view";
+import { SaveMealControl } from "@/components/save-meal-button";
 import { useSupper } from "@/components/supper-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,7 @@ import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
 import { nightShowsRecipePending } from "@/lib/post-lock-waiting";
+import { SAVE_TOAST, UNSAVE_TOAST, mealRecipeKey, mealSaveAvailability, savedMealForKey } from "@/lib/saved-meals";
 import { nightStaysLocked } from "@/lib/week-chrome";
 import type { VoteChoice } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -29,11 +32,13 @@ export default function MealPage({ params }: { params: Promise<{ mealId: string 
 }
 
 function MealDetail({ mealId }: { mealId: string }) {
-  const { snapshot, session, setVote, applyIdea, markLeftovers, proposeReplacement } = useSupper();
+  const { snapshot, session, setVote, applyIdea, markLeftovers, proposeReplacement, toggleSavedMeal } =
+    useSupper();
   const [note, setNote] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customPitch, setCustomPitch] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | undefined>();
   const meal = snapshot?.meals.find((item) => item.id === mealId);
   const latest =
     meal && snapshot
@@ -77,6 +82,29 @@ function MealDetail({ mealId }: { mealId: string }) {
   });
   const voters = votingMembers(snapshot.memberships);
   const canAct = canActOnBallot(session?.role) && !readOnly;
+  const saveAvailability = mealSaveAvailability({
+    meal,
+    votes: snapshot.votes,
+    memberships: snapshot.memberships,
+    recipes: snapshot.recipes,
+  });
+  const recipeKey = mealRecipeKey({ title: meal.title, recipeKey: recipe?.recipeKey });
+  const saved = Boolean(savedMealForKey(snapshot.savedMeals, recipeKey));
+  const saveControl = (
+    <SaveMealControl
+      availability={saveAvailability}
+      saved={saved}
+      canAct={canActOnBallot(session?.role)}
+      onToggle={() => {
+        void toggleSavedMeal(meal.id)
+          .then((result) => {
+            if (result === "saved") setToast(SAVE_TOAST);
+            if (result === "removed") setToast(UNSAVE_TOAST);
+          })
+          .catch(() => undefined);
+      }}
+    />
+  );
 
   const choose = (choice: VoteChoice) => {
     void setVote(meal.id, choice, note).catch(() => undefined);
@@ -102,9 +130,19 @@ function MealDetail({ mealId }: { mealId: string }) {
             This night is off. It did not go on the shopping list.
           </p>
         ) : pendingRecipe ? (
-          <RecipePendingNotice />
+          <>
+            {saveControl}
+            <div className="mt-4">
+              <RecipePendingNotice />
+            </div>
+          </>
         ) : (
-          <RecipeBlock recipe={recipe} servings={meal.servings} />
+          <>
+            {saveControl}
+            <div className="mt-4">
+              <RecipeBlock recipe={recipe} servings={meal.servings} />
+            </div>
+          </>
         )
       ) : (
         <>
@@ -159,6 +197,7 @@ function MealDetail({ mealId }: { mealId: string }) {
           </section> : null}
 
           <section className="mt-8 space-y-4">
+            {saveControl}
             <div className="rounded-[14px] border border-dashed border-border bg-card p-5 shadow-card">
               <h2 className="type-section">Recipe</h2>
               <p className="type-body mt-2 text-muted-foreground">
@@ -239,6 +278,7 @@ function MealDetail({ mealId }: { mealId: string }) {
           </section>
         </>
       )}
+      <BallotToast message={toast} onDismiss={() => setToast(undefined)} />
     </AppShell>
   );
 }

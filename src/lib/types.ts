@@ -107,6 +107,8 @@ export type Recipe = {
   cookMinutes: number;
   steps: string[];
   ingredients: Ingredient[];
+  /** Stable id Meal Ops may stamp. Blank means the saved-meal key is the title. */
+  recipeKey?: string | null;
 };
 
 export type Meal = {
@@ -158,6 +160,18 @@ export type MealHistoryNight = {
 export type MealHistoryWeek = {
   startsOn: string;
   nights: MealHistoryNight[];
+};
+
+/** Household-shared save. One row per recipe identity. */
+export type SavedMeal = {
+  id: string;
+  householdId: string;
+  recipeKey: string;
+  title: string;
+  savedAt: string;
+  lastLockedAt: string | null;
+  requestedForWeek: string | null;
+  sourceRecipeId: string | null;
 };
 
 export type ShoppingItem = {
@@ -243,6 +257,7 @@ export type HouseholdSnapshot = {
   joinToken?: string | null;
   ballotRequest?: BallotRequest | null;
   mealHistory: MealHistoryWeek[];
+  savedMeals: SavedMeal[];
 };
 
 export type ReplacementIdea = {

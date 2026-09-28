@@ -43,6 +43,7 @@ import {
   normalizeNightHeadcounts,
 } from "@/lib/headcount";
 import { parseMealHistory } from "@/lib/meal-history";
+import { parseSavedMeals, savedMealRequestActive } from "@/lib/saved-meals";
 import { redactUntilLocked } from "@/lib/visibility";
 import { parseEditableFrom, parseShoppingPrompt } from "@/lib/week-chrome";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -138,6 +139,7 @@ export async function fetchSupabaseSnapshot(
     joinTokenRes,
     ballotRequestRes,
     historyRes,
+    savedMealsRes,
   ] = await Promise.all([
     client.from("households").select("*").eq("id", householdId).single(),
     client.from("memberships").select("*").eq("household_id", householdId),
@@ -172,6 +174,11 @@ export async function fetchSupabaseSnapshot(
       .limit(1)
       .maybeSingle(),
     client.rpc("meal_history"),
+    client
+      .from("saved_meals")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("saved_at", { ascending: false }),
   ]);
 
   const householdRow = required(householdRes.data, householdRes.error, "Household not found");
@@ -211,6 +218,8 @@ export async function fetchSupabaseSnapshot(
       prepMinutes: row.prep_minutes,
       cookMinutes: row.cook_minutes,
       steps: row.steps ?? [],
+      recipeKey:
+        typeof row.recipe_key === "string" && row.recipe_key.trim() ? row.recipe_key.trim() : null,
       ingredients: (ingredientsRes.data ?? [])
         .filter((ingredient) => ingredient.recipe_id === row.id)
         .map((ingredient) => ({
@@ -345,6 +354,7 @@ export async function fetchSupabaseSnapshot(
     joinToken: joinTokenRes.error ? null : (joinTokenRes.data?.token ?? null),
     ballotRequest: mapBallotRequest(ballotRequestRes.data, ballotRequestRes.error, week.id),
     mealHistory: parseMealHistory(historyRes.error ? null : historyRes.data),
+    savedMeals: parseSavedMeals(savedMealsRes.error ? null : savedMealsRes.data),
   };
 
   return redactUntilLocked(snapshot);
@@ -687,6 +697,83 @@ export async function supabaseRequestWeekBallot(client: SupabaseClient) {
   if (error) throw new Error(error.message);
   if (typeof data !== "string" || !data) throw new Error("Could not create this week's meals request.");
   return data;
+}
+
+function requireVoter(session: Session) {
+  if (!session.householdId) throw new Error("Not in a household");
+  if (!canActOnBallot(session.role)) throw new Error("Eaters can look, not change saved meals.");
+}
+
+export async function supabaseSaveMeal(
+  client: SupabaseClient,
+  session: Session,
+  input: {
+    recipeKey: string;
+    title: string;
+    sourceRecipeId: string | null;
+    lastLockedAt: string | null;
+  },
+) {
+  requireVoter(session);
+  const recipeKey = input.recipeKey.trim();
+  const title = input.title.trim();
+  if (!recipeKey || !title) throw new Error("Save when the recipe is ready.");
+  const { error } = await client.from("saved_meals").upsert(
+    {
+      household_id: session.householdId,
+      recipe_key: recipeKey,
+      title,
+      source_recipe_id: input.sourceRecipeId,
+      last_locked_at: input.lastLockedAt,
+      saved_at: new Date().toISOString(),
+      requested_for_week: null,
+    },
+    { onConflict: "household_id,recipe_key" },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function supabaseRemoveSavedMeal(
+  client: SupabaseClient,
+  session: Session,
+  recipeKey: string,
+) {
+  requireVoter(session);
+  const key = recipeKey.trim();
+  if (!key) throw new Error("That saved meal is gone.");
+  const { error } = await client
+    .from("saved_meals")
+    .delete()
+    .eq("household_id", session.householdId)
+    .eq("recipe_key", key);
+  if (error) throw new Error(error.message);
+}
+
+export async function supabaseRequestSavedMeal(
+  client: SupabaseClient,
+  session: Session,
+  input: { recipeKey: string; requestedForWeek: string; currentWeekStartsOn: string },
+): Promise<"requested" | "already"> {
+  requireVoter(session);
+  const recipeKey = input.recipeKey.trim();
+  const { data, error } = await client
+    .from("saved_meals")
+    .select("recipe_key, requested_for_week")
+    .eq("household_id", session.householdId)
+    .eq("recipe_key", recipeKey)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("That saved meal is gone.");
+  const requestedForWeek =
+    typeof data.requested_for_week === "string" ? data.requested_for_week.slice(0, 10) : null;
+  if (savedMealRequestActive({ requestedForWeek }, input.currentWeekStartsOn)) return "already";
+  const { error: updateError } = await client
+    .from("saved_meals")
+    .update({ requested_for_week: input.requestedForWeek })
+    .eq("household_id", session.householdId)
+    .eq("recipe_key", recipeKey);
+  if (updateError) throw new Error(updateError.message);
+  return "requested";
 }
 
 export type BotCheckStatusResult =

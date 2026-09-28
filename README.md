@@ -117,6 +117,8 @@ The app needs **all nine** files under [`supabase/migrations/`](supabase/migrati
 
 Skipping a file (or running them out of order) will break people, lock, off nights, or the post-create setup / invite link. File 6 grants `authenticated` `USAGE` on schema `private` — without it, Create household can succeed while you stay on **Create household**. File 7 adds `/join/<token>` links. File 8 is wizard v2 (`household_size`, `nights_planned`, `postal_code`, `ballot_requests`, no default Trader Joe’s / Smith’s on create). File 9 stores Bot check frequency (`bot_check_mode` defaults to `adaptive`; fixed checks use `bot_check_interval_hours` of 1, 3, or 6).
 
+After those nine, run every later file in [`supabase/migrations/`](supabase/migrations/) in filename order. That includes meal history, store slugs, week chrome, and `supabase/migrations/20260928183000_saved_meals.sql` (household Saved meals). See [`docs/saved-meals.md`](docs/saved-meals.md).
+
 ### 5. Auth: Email on, Confirm email OFF
 
 Do this only after you know the final HTTPS origin from step 2.
@@ -328,7 +330,7 @@ Optional on GitHub: **Settings → Branches** → protect `main` and require the
 
 ## Schema
 
-`Household` (including `setup_step` 1–7 wizard / 8 done, `household_size`, `nights_planned`, `postal_code`, optional `weekly_budget_cents`, `bot_check_mode` default `adaptive`, and `bot_check_interval_hours` null unless fixed at 1, 3, or 6), `Membership` (owner / voter / eater), `User` (`auth.users` + `profiles`), `Week`, `Meal`, `Vote`, `Recipe`, `ShoppingList`, `ShoppingItem` (store tag, quantity, optional `price_cents` + `price_source` + `priced_at`). Pending people live in `household_invites` until they sign in. Textable partner links live in `household_join_tokens` (`/join/<token>`). Meal Ops inbox is `ballot_requests` (pending → fulfilled when meals are inserted). Quiet bot wakes use `GET /api/bot/status`.
+`Household` (including `setup_step` 1–7 wizard / 8 done, `household_size`, `nights_planned`, `postal_code`, optional `weekly_budget_cents`, `bot_check_mode` default `adaptive`, and `bot_check_interval_hours` null unless fixed at 1, 3, or 6), `Membership` (owner / voter / eater), `User` (`auth.users` + `profiles`), `Week`, `Meal`, `Vote`, `Recipe`, `ShoppingList`, `ShoppingItem` (store tag, quantity, optional `price_cents` + `price_source` + `priced_at`). Pending people live in `household_invites` until they sign in. Textable partner links live in `household_join_tokens` (`/join/<token>`). Meal Ops inbox is `ballot_requests` (pending → fulfilled when meals are inserted). `saved_recipe_keys` are explicit Saved meal requests for that week (cool-down bypass). `saved_pool_keys` is the random-suggest snapshot (21 days after `last_locked_at`, no outstanding request). Household rows live in `saved_meals` (`recipe_key`, `saved_at`, `last_locked_at`, optional `requested_for_week`). Read path: [`docs/saved-meals.md`](docs/saved-meals.md). Quiet bot wakes use `GET /api/bot/status`.
 
 Eaters can belong to the household later without voting. Only owner and voter roles count toward lock. Households are rows in this schema, not separate Workers.
 

@@ -21,6 +21,9 @@ import {
   patchStoreAdded,
   patchStoreRemoved,
   LIST_CHECK_SAVE_ERROR,
+  patchSavedMealAdded,
+  patchSavedMealRemoved,
+  patchSavedMealRequest,
   patchShoppingPrompt,
   patchVote,
   queueOptimistic,
@@ -28,6 +31,7 @@ import {
   type PendingOptimistic,
 } from "@/lib/optimistic";
 import { getPublicSupabaseConfig, isSupabaseConfigured } from "@/lib/config";
+import { mealRecipeKey, nextWeekStartsOn, savedMealForKey, savedMealRequestActive } from "@/lib/saved-meals";
 import { PASSWORD_MIN_LENGTH, passwordResetRedirectUrl } from "@/lib/login";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -43,7 +47,10 @@ import {
   supabaseProposeReplacement,
   supabaseRemoveInvite,
   supabaseRemoveMember,
+  supabaseRemoveSavedMeal,
+  supabaseRequestSavedMeal,
   supabaseRequestWeekBallot,
+  supabaseSaveMeal,
   supabaseSetMemberRole,
   supabaseSetVote,
   supabaseToggleItem,
@@ -114,6 +121,9 @@ type SupperContextValue = {
   claimJoinToken: (token: string) => Promise<void>;
   createJoinToken: (rotate?: boolean) => Promise<string>;
   requestWeekBallot: () => Promise<string>;
+  toggleSavedMeal: (mealId: string) => Promise<"saved" | "removed">;
+  removeSavedMeal: (recipeKey: string) => Promise<void>;
+  requestSavedMeal: (recipeKey: string) => Promise<"requested" | "already">;
 };
 
 const SupperContext = createContext<SupperContextValue | null>(null);
@@ -163,6 +173,9 @@ function createSetupContext(): SupperContextValue {
     claimJoinToken: async () => setupUnavailable(),
     createJoinToken: async () => setupUnavailable(),
     requestWeekBallot: async () => setupUnavailable(),
+    toggleSavedMeal: async () => setupUnavailable(),
+    removeSavedMeal: async () => setupUnavailable(),
+    requestSavedMeal: async () => setupUnavailable(),
   };
 }
 
@@ -341,6 +354,7 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "weeks" }, () => void refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "shopping_items" }, () => void refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "ballot_requests" }, () => void refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "saved_meals" }, () => void refresh())
       .subscribe();
     return () => {
       cancelled = true;
@@ -681,6 +695,100 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client) throw new Error("Not signed in");
           return supabaseRequestWeekBallot(client);
         }),
+      toggleSavedMeal: (mealId) => {
+        const current = session;
+        const visible = displayRef.current;
+        if (!current || !visible) {
+          return run(async () => {
+            throw new Error("Not signed in");
+          });
+        }
+        const meal = visible.meals.find((item) => item.id === mealId);
+        if (!meal) {
+          return run(async () => {
+            throw new Error("That night is not on this week.");
+          });
+        }
+        const recipe = visible.recipes.find((item) => item.mealId === meal.id);
+        const recipeKey = mealRecipeKey({ title: meal.title, recipeKey: recipe?.recipeKey });
+        const existing = savedMealForKey(visible.savedMeals, recipeKey);
+        if (existing) {
+          return runOptimistic(`saved:${recipeKey}`, (snap) => patchSavedMealRemoved(snap, recipeKey), async () => {
+            const client = createSupabaseBrowserClient();
+            if (!client) throw new Error("Not signed in");
+            await supabaseRemoveSavedMeal(client, current, recipeKey);
+            return "removed" as const;
+          });
+        }
+        const savedAt = new Date().toISOString();
+        const lastLockedAt =
+          visible.week.status === "locked" ? visible.week.lockedAt ?? savedAt : null;
+        return runOptimistic(
+          `saved:${recipeKey}`,
+          (snap) =>
+            patchSavedMealAdded(snap, {
+              id: `optimistic-saved-${recipeKey}`,
+              householdId: current.householdId ?? snap.household.id,
+              recipeKey,
+              title: meal.title.trim(),
+              savedAt,
+              lastLockedAt,
+              requestedForWeek: null,
+              sourceRecipeId: recipe?.id ?? null,
+            }),
+          async () => {
+            const client = createSupabaseBrowserClient();
+            if (!client) throw new Error("Not signed in");
+            await supabaseSaveMeal(client, current, {
+              recipeKey,
+              title: meal.title.trim(),
+              sourceRecipeId: recipe?.id ?? null,
+              lastLockedAt,
+            });
+            return "saved" as const;
+          },
+        );
+      },
+      removeSavedMeal: (recipeKey) => {
+        const current = session;
+        return runOptimistic(`saved:${recipeKey}`, (snap) => patchSavedMealRemoved(snap, recipeKey), async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client || !current) throw new Error("Not signed in");
+          await supabaseRemoveSavedMeal(client, current, recipeKey);
+        });
+      },
+      requestSavedMeal: (recipeKey) => {
+        const current = session;
+        const visible = displayRef.current;
+        if (!current || !visible) {
+          return run(async () => {
+            throw new Error("Not signed in");
+          });
+        }
+        const existing = savedMealForKey(visible.savedMeals, recipeKey);
+        if (!existing) {
+          return run(async () => {
+            throw new Error("That saved meal is gone.");
+          });
+        }
+        if (savedMealRequestActive(existing, visible.week.startsOn)) {
+          return Promise.resolve("already" as const);
+        }
+        const requestedForWeek = nextWeekStartsOn(visible.week.startsOn);
+        return runOptimistic(
+          `saved-request:${recipeKey}`,
+          (snap) => patchSavedMealRequest(snap, recipeKey, requestedForWeek),
+          async () => {
+            const client = createSupabaseBrowserClient();
+            if (!client) throw new Error("Not signed in");
+            return supabaseRequestSavedMeal(client, current, {
+              recipeKey,
+              requestedForWeek,
+              currentWeekStartsOn: visible.week.startsOn,
+            });
+          },
+        );
+      },
     }),
     // refresh/run close over the latest session and snapshot on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps

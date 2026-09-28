@@ -27,6 +27,7 @@ import {
   weeklyBudgetCurrencyPrefix,
 } from "@/lib/house-setup";
 import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
+import { SAVED_MEALS_LABEL, SAVED_MEALS_ROW_SUB } from "@/lib/saved-meals";
 import { isAdmin, roleLabel } from "@/lib/users";
 
 export default function SettingsPage() {
@@ -102,14 +103,27 @@ function SettingsBody() {
 
       <AppearancePicker />
 
-      <Link
-        href="/settings/history"
-        data-slot="past-weeks-row"
-        className="mt-6 flex min-h-12 items-center justify-between rounded-[14px] bg-card px-5 shadow-card"
-      >
-        <span className="type-section text-primary">{PAST_WEEKS_LABEL}</span>
-        <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
-      </Link>
+      <div className="mt-6 space-y-3">
+        <Link
+          href="/settings/saved"
+          data-slot="saved-meals-row"
+          className="flex min-h-12 items-center justify-between gap-3 rounded-[14px] bg-card px-5 py-3 shadow-card"
+        >
+          <span>
+            <span className="type-section block text-primary">{SAVED_MEALS_LABEL}</span>
+            <span className="type-meta text-muted-foreground">{SAVED_MEALS_ROW_SUB}</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
+        <Link
+          href="/settings/history"
+          data-slot="past-weeks-row"
+          className="flex min-h-12 items-center justify-between rounded-[14px] bg-card px-5 shadow-card"
+        >
+          <span className="type-section text-primary">{PAST_WEEKS_LABEL}</span>
+          <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+        </Link>
+      </div>
 
       {shouldShowHouseSetup(session?.role, snapshot.household.setupStep) ? (
         <HouseCard className="mt-6">
