@@ -136,10 +136,13 @@ describe("week chrome markup", () => {
       }),
     );
     expect(strip).toContain('data-locked="true"');
+    expect(strip).toContain("h-[44px]");
     expect(strip).toContain("min-h-[44px]");
     expect(strip).toContain("min-w-[44px]");
     expect(strip).toContain("gap-2");
-    expect(strip).toContain("py-3");
+    expect(strip).toContain("py-1");
+    expect(strip).not.toContain("py-3");
+    expect(strip).not.toContain(">&nbsp;<");
     expect(strip).toContain('data-today="true"');
     expect(strip).toContain("bg-primary");
     expect(strip).toContain('data-past="true"');

@@ -24,7 +24,11 @@ export function WeekStrip({
   const muted = new Set(mutedDates);
 
   return (
-    <div data-slot="week-strip" data-locked={locked ? "true" : "false"} className="overflow-x-auto py-3">
+    <div
+      data-slot="week-strip"
+      data-locked={locked ? "true" : "false"}
+      className="-mx-4 overflow-x-auto px-px py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       <div role="group" aria-label="Jump to a night" className="flex w-max min-w-full gap-2">
         {cells.map((cell) => {
           const selected = cell.mealId === selectedMealId;
@@ -45,7 +49,7 @@ export function WeekStrip({
               aria-label={past ? `${label}, read only` : label}
               onClick={() => onSelect(cell.mealId)}
               className={cn(
-                "flex min-h-[44px] min-w-[44px] flex-1 basis-0 shrink-0 flex-col items-center justify-center rounded-[12px] px-0.5 py-1",
+                "relative flex h-[44px] min-h-[44px] min-w-[44px] flex-1 basis-0 shrink-0 flex-col items-center justify-start gap-0.5 rounded-[12px] px-0.5 pt-0.5 leading-none",
                 today && "bg-primary text-primary-foreground",
                 !today && past && "text-muted-foreground",
                 !today && past && selected && "bg-muted",
@@ -54,10 +58,12 @@ export function WeekStrip({
               )}
             >
               <span className="text-[11px] font-semibold leading-none">{cell.letter}</span>
-              <span className="mt-1 text-sm font-semibold leading-none">{cell.day}</span>
-              <span className="mt-0.5 h-3 text-[10px] font-semibold leading-3 opacity-80">
-                {cell.month ?? "\u00a0"}
-              </span>
+              <span className="text-sm font-semibold leading-none">{cell.day}</span>
+              {cell.month ? (
+                <span className="absolute inset-x-0 bottom-0.5 text-center text-[10px] font-semibold leading-none opacity-80">
+                  {cell.month}
+                </span>
+              ) : null}
             </button>
           );
         })}

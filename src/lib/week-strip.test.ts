@@ -73,10 +73,13 @@ describe("This week strip", () => {
     expect(chrome).not.toContain("bg-background/95");
     expect(chrome).not.toContain("backdrop-blur");
     expect(strip).toContain('data-slot="week-strip"');
+    expect(strip).toContain("h-[44px]");
     expect(strip).toContain("min-h-[44px]");
     expect(strip).toContain("min-w-[44px]");
     expect(strip).toContain("gap-2");
-    expect(strip).toContain("py-3");
+    expect(strip).toContain("py-1");
+    expect(strip).not.toContain("py-3");
+    expect(strip).not.toContain("h-3");
     expect(strip).toContain("flex-1");
     expect(strip).toContain('type="button"');
     expect(strip).not.toContain("<Lock");
