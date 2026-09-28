@@ -5,11 +5,12 @@ import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { LockFirstEmpty } from "@/components/lock-first-empty";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
+import { PastWeekDetail } from "@/components/past-weeks";
 import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { useViewedWeek } from "@/components/use-viewed-week";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
-import { formatWeekEyebrow, weekdayShortFromNight } from "@/lib/dates";
+import { formatWeekEyebrow, formatWeekRange, weekdayShortFromNight } from "@/lib/dates";
 import { todayInTimeZone } from "@/lib/meal-history";
 import { isNightOff } from "@/lib/lock";
 import {
@@ -34,8 +35,29 @@ export default function RecipesPage() {
 
 function RecipesBody() {
   const { snapshot } = useSupper();
-  const { role, scope } = useViewedWeek();
-  if (!snapshot || !scope) {
+  const { role, scope, past } = useViewedWeek();
+  if (!snapshot) {
+    return (
+      <AppShell title="Recipes">
+        <p className="type-body text-muted-foreground">{RECIPES_NO_HOUSEHOLD}</p>
+      </AppShell>
+    );
+  }
+
+  if (past) {
+    return (
+      <AppShell
+        title="Recipes"
+        eyebrow={formatWeekRange(past.startsOn)}
+        backHref="/week"
+        backLabel={formatWeekRange(past.startsOn)}
+      >
+        <PastWeekDetail week={past} />
+      </AppShell>
+    );
+  }
+
+  if (!scope) {
     return (
       <AppShell title="Recipes">
         <p className="type-body text-muted-foreground">{RECIPES_NO_HOUSEHOLD}</p>

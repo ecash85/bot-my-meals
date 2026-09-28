@@ -54,13 +54,31 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).not.toMatch(/grandma/i);
 }
 
+function expectStripNavigatorInstallPaste(doc: string) {
+  expect(doc).toMatch(/horizontal swipe/);
+  expect(doc).toMatch(/date strip/);
+  expect(doc).toMatch(/edge ‹ ›/);
+  expect(doc).toMatch(/they are status, not the switcher/);
+  expect(doc).toMatch(/This week/);
+  expect(doc).toMatch(/Next week/);
+  expect(doc).toMatch(/no chip row/);
+  expect(doc).toMatch(/cannot open a week-after-next/);
+  expect(doc).toMatch(/titles only/);
+  expect(doc).toMatch(/House → Past weeks/);
+  expect(doc).toMatch(/Plan next week/);
+  expect(doc).toMatch(/0 gap/);
+  expect(doc).not.toMatch(/This week \| Next week switcher/);
+  expect(doc).not.toMatch(/When both exist, (?:a \*\*)?This week \| Next week/);
+  expect(doc).not.toMatch(/the app shows a This week \| Next week switcher/);
+}
+
 function expectDualWeekInstallPaste(paste: string) {
   expect(paste).toMatch(/Create this week's meals/);
   expect(paste).toMatch(/do not create a planning week during setup/);
   expect(paste).toMatch(/one cooking week \+ one planning week/);
   expect(paste).toMatch(/Do not open a third week/);
   expect(paste).toMatch(/Home always opens on the cooking week/);
-  expect(paste).toMatch(/This week \| Next week/);
+  expectStripNavigatorInstallPaste(paste);
   expect(paste).toMatch(/week-scoped/);
   expect(paste).toMatch(/Waiting, Lock, recipes, shopping, Check now, and Wake/);
   expect(paste).toMatch(/Shopping · This week/);
@@ -81,7 +99,7 @@ function expectDualWeekInstallPaste(paste: string) {
 function expectDualWeekProductLoop(readme: string) {
   expect(readme).toMatch(/Install does not create a planning week/);
   expect(readme).toMatch(/one cooking week \+ one planning week/);
-  expect(readme).toMatch(/This week \| Next week/);
+  expectStripNavigatorInstallPaste(readme);
   expect(readme).toMatch(/Shopping · This week/);
   expect(readme).toMatch(/Shopping · Next week/);
   expect(readme).toMatch(/never merge cooking \+ planning/);
@@ -155,6 +173,12 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/Shopping · This week/);
     expect(routines).toMatch(/Shopping · Next week/);
     expect(routines).toMatch(/do not merge this week with next week/);
+    expect(routines).toMatch(/horizontal swipe/);
+    expect(routines).toMatch(/date strip/);
+    expect(routines).toMatch(/edge ‹ ›/);
+    expect(routines).toMatch(/no chip row|not a chip row/);
+    expect(routines).toMatch(/status, not the switcher/);
+    expect(routines).not.toMatch(/This week \| Next week switcher/);
   });
 
   it("locks dual-week Install paste after first-ballot setup without forcing a planning week on day 1", () => {
@@ -180,11 +204,16 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(saved).toMatch(/Requested for next week/);
     expect(saved).toMatch(/will not open a week after next/);
     expect(saved).toMatch(/do not say this week/);
+    expect(saved).toMatch(/Plan next week/);
+    expect(saved).toMatch(/same create path/);
+    expect(saved).toMatch(/will not invent a third open week/);
     expect(saved).not.toMatch(/grandma/i);
 
     expect(routines).toMatch(/Waiting titles name/);
     expect(routines).toMatch(/Shopping · This week/);
     expect(routines).toMatch(/fulfill `reason` for the week that needs work/);
+    expect(routines).toMatch(/horizontal swipe/);
+    expect(routines).toMatch(/not a chip row/);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {

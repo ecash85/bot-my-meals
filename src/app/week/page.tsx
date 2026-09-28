@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { BallotCard } from "@/components/ballot-card";
@@ -13,13 +13,13 @@ import { EmptyDayCard } from "@/components/empty-day-card";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
 import { LockedNightFrame, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
+import { PastWeekDetail } from "@/components/past-weeks";
 import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { WeekChrome } from "@/components/week-chrome";
 import { Onboarding } from "@/components/onboarding";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useSupper } from "@/components/supper-provider";
 import { useViewedWeek } from "@/components/use-viewed-week";
-import { WeekSwitcher } from "@/components/week-switcher";
 import { isHouseSetupComplete, shouldShowHouseSetup } from "@/lib/house-setup";
 import { isAdmin } from "@/lib/users";
 import { Button } from "@/components/ui/button";
@@ -32,16 +32,18 @@ import {
   type WeekNightPresentation,
 } from "@/lib/ballot";
 import { botCheckForHousehold } from "@/lib/bot-check";
-import { PLAN_NEXT_WEEK_LABEL, weekHomeTitle } from "@/lib/open-weeks";
-import {
-  POST_LOCK_GET_RECIPES_NEXT_HINT,
-  POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT,
-} from "@/lib/post-lock-waiting";
-import { formatMealCardDayLabel, formatWeekRange, weekdayLabelFromNight } from "@/lib/dates";
+import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
+import {
+  navigatorEyebrow,
+  navigatorHref,
+  navigatorTitle,
+  selectionFromStop,
+  stepNavigator,
+} from "@/lib/week-navigator";
+import { isPendingBotFill, lockedDinnerTap, POST_LOCK_GET_RECIPES_NEXT_HINT, POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT } from "@/lib/post-lock-waiting";
 import { focusNightCard, nightCardAnchorId } from "@/lib/week-strip";
 import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
-import { isPendingBotFill, lockedDinnerTap } from "@/lib/post-lock-waiting";
 import { recipeNightsForWeek } from "@/lib/recipes";
 import {
   nightHasStripMeal,
@@ -76,67 +78,119 @@ function WeekBody() {
 }
 
 function WeekBallot() {
+  const router = useRouter();
   const { session, snapshot, setVote, requestWeekBallot, planNextWeek } = useSupper();
-  const { role, scope, hasPlanning, setViewedRole } = useViewedWeek();
+  const { role, scope, past, hasPlanning, stops, index, setViewedWeek } = useViewedWeek();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | undefined>();
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
-  const [chromeH, setChromeH] = useState(0);
-  const onChromeHeight = useCallback((height: number) => setChromeH(height), []);
   const dismissToast = useCallback(() => setToast(undefined), []);
   const jumpToNight = useCallback((mealId: string) => {
     setSelectedNightId(mealId);
     focusNightCard(mealId, (id) => document.getElementById(id));
   }, []);
-  const weekQuery = searchParams.get("week");
+  const searchKey = searchParams.toString();
+  const previousSearch = useRef<string | null>(null);
   useEffect(() => {
-    if (weekQuery === "next" && hasPlanning) setViewedRole("planning");
-    if (weekQuery === "this") setViewedRole("cooking");
-  }, [weekQuery, hasPlanning, setViewedRole]);
-  if (!snapshot || !scope) return null;
+    if (!snapshot) return;
+    const pastQuery = searchParams.get("past");
+    const weekQuery = searchParams.get("week");
+    const previous = previousSearch.current;
+    previousSearch.current = searchKey;
+    if (pastQuery && snapshot.mealHistory.some((week) => week.startsOn === pastQuery)) {
+      setViewedWeek({ kind: "past", startsOn: pastQuery });
+      return;
+    }
+    if (weekQuery === "next" && snapshot.planning) {
+      setViewedWeek({ kind: "planning" });
+      return;
+    }
+    if (weekQuery === "this") {
+      setViewedWeek({ kind: "cooking" });
+      return;
+    }
+    if (previous && previous.length > 0) setViewedWeek({ kind: "cooking" });
+  }, [searchKey, searchParams, snapshot, setViewedWeek]);
 
-  const locked = scope.week.status === "locked";
+  const stepWeek = useCallback(
+    (direction: -1 | 1) => {
+      const result = stepNavigator(stops, index, direction);
+      if (!result.moved) return false;
+      const selection = selectionFromStop(result.stop);
+      setViewedWeek(selection);
+      setSelectedNightId(null);
+      router.replace(navigatorHref(selection), { scroll: false });
+      return true;
+    },
+    [stops, index, setViewedWeek, router],
+  );
+
+  if (!snapshot) return null;
+  const viewingPast = Boolean(past);
+  if (!viewingPast && !scope) return null;
+
+  const locked = scope?.week.status === "locked";
   const todayIso = todayInTimeZone(new Date(), snapshot.household.timezone);
-  const pendingFill = isPendingBotFill({
-    weekStatus: scope.week.status,
-    meals: scope.meals,
-    votes: scope.votes,
-    memberships: snapshot.memberships,
-    recipes: scope.recipes,
-    shoppingList: scope.shoppingList,
-  });
+  const pendingFill =
+    scope != null &&
+    isPendingBotFill({
+      weekStatus: scope.week.status,
+      meals: scope.meals,
+      votes: scope.votes,
+      memberships: snapshot.memberships,
+      recipes: scope.recipes,
+      shoppingList: scope.shoppingList,
+    });
   const botCheck = botCheckForHousehold(snapshot);
-  const check = checkWeekLock(scope.meals, scope.votes, snapshot.memberships);
-  const nights = recipeNightsForWeek(scope.meals);
-  const dinner = upcomingDinner(scope.meals, scope.votes, todayIso);
+  const check = scope ? checkWeekLock(scope.meals, scope.votes, snapshot.memberships) : { ready: false };
+  const nights = scope ? recipeNightsForWeek(scope.meals) : [];
+  const dinner = scope ? upcomingDinner(scope.meals, scope.votes, todayIso) : undefined;
   const firstMeal =
-    showFirstMealRow({ weekStatus: scope.week.status, pendingFill, meal: dinner }) && dinner
+    scope && showFirstMealRow({ weekStatus: scope.week.status, pendingFill, meal: dinner }) && dinner
       ? {
           id: dinner.id,
           title: dinner.title,
           weekday: weekdayLabelFromNight(dinner.nightDate),
         }
       : null;
-  const stripNights = nights.map((meal) => ({
-    id: meal.id,
-    nightDate: meal.nightDate,
-    hasMeal: nightHasStripMeal(meal, scope.votes, snapshot.memberships),
-  }));
-  const mutedDates = stripNights
-    .filter(
-      (night) =>
-        night.hasMeal &&
-        stripCellMuted({
-          weekStatus: scope.week.status,
-          nightDate: night.nightDate,
-          editableFrom: scope.week.editableFrom,
-        }),
-    )
-    .map((night) => night.nightDate);
+  const stripNights = viewingPast
+    ? (past?.nights ?? []).map((night) => ({
+        id: night.nightDate,
+        nightDate: night.nightDate,
+        hasMeal: true,
+      }))
+    : nights.map((meal) => ({
+        id: meal.id,
+        nightDate: meal.nightDate,
+        hasMeal: nightHasStripMeal(meal, scope?.votes ?? [], snapshot.memberships),
+      }));
+  const mutedDates =
+    scope == null
+      ? []
+      : stripNights
+          .filter(
+            (night) =>
+              night.hasMeal &&
+              stripCellMuted({
+                weekStatus: scope.week.status,
+                nightDate: night.nightDate,
+                editableFrom: scope.week.editableFrom,
+              }),
+          )
+          .map((night) => night.nightDate);
   const todayMealId =
     stripNights.find((night) => night.hasMeal && night.nightDate === todayIso)?.id ?? null;
+  const activeStop = stops[index];
+  const title = activeStop ? navigatorTitle(activeStop) : "This week";
+  const eyebrow = activeStop ? navigatorEyebrow(activeStop) : null;
+  const showPlan =
+    !viewingPast &&
+    role === "cooking" &&
+    !hasPlanning &&
+    isAdmin(session?.role) &&
+    isHouseSetupComplete(snapshot.household.setupStep);
 
   const act = async (mealId: string, choice: VoteChoice, note?: string) => {
     try {
@@ -149,57 +203,66 @@ function WeekBallot() {
 
   return (
     <AppShell
-      title={weekHomeTitle(role)}
-      eyebrow={hasPlanning ? undefined : formatWeekRange(scope.week.startsOn)}
-      headerExtra={
-        hasPlanning && snapshot.planning ? (
-          <WeekSwitcher
-            role={role}
-            cookingStartsOn={snapshot.week.startsOn}
-            planningStartsOn={snapshot.planning.week.startsOn}
-            onSelect={setViewedRole}
-          />
-        ) : undefined
-      }
+      title={title}
+      eyebrow={eyebrow?.text}
+      eyebrowMuted={eyebrow?.muted}
       titleAside={locked ? <UnlockWeekControl variant="inline" /> : undefined}
+      chrome={
+        <WeekChrome
+          startsOn={activeStop?.startsOn ?? snapshot.week.startsOn}
+          nights={stripNights}
+          selectedMealId={selectedNightId ?? (viewingPast ? null : todayMealId)}
+          todayIso={todayIso}
+          locked={Boolean(locked)}
+          mutedDates={mutedDates}
+          showShoppingList={
+            scope != null &&
+            showOpenShoppingList({
+              weekStatus: scope.week.status,
+              shoppingPrompt: scope.week.shoppingPrompt,
+              pendingFill,
+              items: scope.shoppingList?.items ?? null,
+            })
+          }
+          firstMeal={firstMeal}
+          onSelect={jumpToNight}
+          onStep={stepWeek}
+          planNext={
+            showPlan
+              ? {
+                  busy: planning,
+                  onPlan: () => {
+                    setPlanning(true);
+                    void planNextWeek()
+                      .then(() => router.replace(navigatorHref({ kind: "planning" }), { scroll: false }))
+                      .catch(() => undefined)
+                      .finally(() => setPlanning(false));
+                  },
+                }
+              : null
+          }
+        />
+      }
       status={undefined}
-      footer={!locked && check.ready ? <LockBar /> : undefined}
+      footer={!viewingPast && !locked && check.ready ? <LockBar /> : undefined}
     >
       <InstallPrompt />
-      {nights.length === 0 ? (
-        <EmptyWeek onCreateMeals={() => requestWeekBallot(scope.week.startsOn)} />
+      {viewingPast && past ? (
+        <PastWeekDetail week={past} />
+      ) : nights.length === 0 ? (
+        <EmptyWeek onCreateMeals={() => requestWeekBallot(scope?.week.startsOn)} />
       ) : (
-        <div
-          className="space-y-3"
-          style={{ "--week-chrome-h": `${chromeH}px` } as CSSProperties}
-        >
+        <div className="space-y-3">
           {pendingFill ? (
             <div data-slot="week-pending-fill" data-state="pending" className="mb-4">
               <PostLockWaitingCard
                 mode={snapshot.household.botCheckMode}
                 intervalHours={snapshot.household.botCheckIntervalHours}
                 weekRole={role}
-                startsOn={scope.week.startsOn}
+                startsOn={scope?.week.startsOn ?? snapshot.week.startsOn}
               />
             </div>
           ) : null}
-          <WeekChrome
-            startsOn={scope.week.startsOn}
-            nights={stripNights}
-            selectedMealId={selectedNightId ?? todayMealId}
-            todayIso={todayIso}
-            locked={locked}
-            mutedDates={mutedDates}
-            showShoppingList={showOpenShoppingList({
-              weekStatus: scope.week.status,
-              shoppingPrompt: scope.week.shoppingPrompt,
-              pendingFill,
-              items: scope.shoppingList?.items ?? null,
-            })}
-            firstMeal={firstMeal}
-            onSelect={jumpToNight}
-            onHeight={onChromeHeight}
-          />
           <WaitingBotCheck
             status={botCheck}
             pendingWorkOnly
@@ -210,12 +273,12 @@ function WeekBallot() {
           {nights.map((meal) => {
             const dayLabel = formatMealCardDayLabel(meal.nightDate);
             const dayName = weekdayLabelFromNight(meal.nightDate);
-            const latest = latestVoteForMeal(scope.votes, meal.id, snapshot.memberships);
-            const lifecycle = nightLifecycle(meal, scope.votes, snapshot.memberships);
+            const latest = latestVoteForMeal(scope?.votes ?? [], meal.id, snapshot.memberships);
+            const lifecycle = nightLifecycle(meal, scope?.votes ?? [], snapshot.memberships);
             const nightLocked = nightStaysLocked({
-              weekStatus: scope.week.status,
+              weekStatus: scope?.week.status ?? "voting",
               nightDate: meal.nightDate,
-              editableFrom: scope.week.editableFrom,
+              editableFrom: scope?.week.editableFrom ?? null,
             });
             const canVote =
               Boolean(session?.membershipId) && canActOnBallot(session?.role) && !nightLocked;
@@ -227,7 +290,7 @@ function WeekBallot() {
                 id={nightCardAnchorId(meal.id)}
                 tabIndex={-1}
                 data-slot="night-card-anchor"
-                className="scroll-mt-[calc(var(--shell-head-h)+var(--week-chrome-h,0px)+0.25rem)] rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
+                className="scroll-mt-[calc(var(--shell-head-h)+0.25rem)] rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
               >
                 {renderNightCard({
                   presentation,
@@ -247,24 +310,6 @@ function WeekBallot() {
           })}
         </div>
       )}
-      {role === "cooking" && !hasPlanning && isAdmin(session?.role) && isHouseSetupComplete(snapshot.household.setupStep) ? (
-        <p className="mt-6 text-center">
-          <button
-            type="button"
-            data-slot="plan-next-week"
-            className="type-meta min-h-11 text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4"
-            disabled={planning}
-            onClick={() => {
-              setPlanning(true);
-              void planNextWeek()
-                .catch(() => undefined)
-                .finally(() => setPlanning(false));
-            }}
-          >
-            {planning ? "Saving…" : PLAN_NEXT_WEEK_LABEL}
-          </button>
-        </p>
-      ) : null}
       {snapshot.mealHistory.length > 0 ? (
         <p className="mt-6 text-center">
           <Link
@@ -283,7 +328,7 @@ function WeekBallot() {
         mode={snapshot.household.botCheckMode}
         intervalHours={snapshot.household.botCheckIntervalHours}
         weekRole={role}
-        startsOn={scope.week.startsOn}
+        startsOn={scope?.week.startsOn ?? past?.startsOn ?? snapshot.week.startsOn}
       />
     </AppShell>
   );

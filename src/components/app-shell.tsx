@@ -18,9 +18,10 @@ const TABS = [
 export function AppShell({
   title,
   eyebrow,
+  eyebrowMuted = false,
   backHref,
   backLabel = "This week",
-  headerExtra,
+  chrome,
   status,
   titleAside,
   footer,
@@ -29,10 +30,11 @@ export function AppShell({
 }: {
   title: string;
   eyebrow?: string;
+  eyebrowMuted?: boolean;
   backHref?: string;
   backLabel?: string;
-  /** Week switcher, under the wordmark. Replaces the lone title when both weeks are open. */
-  headerExtra?: ReactNode;
+  /** Flush under the title row, inside the same sticky block as the header. */
+  chrome?: ReactNode;
   status?: ReactNode;
   titleAside?: ReactNode;
   footer?: ReactNode;
@@ -60,20 +62,26 @@ export function AppShell({
     >
       <div
         ref={headRef}
-        className="sticky top-0 z-20 bg-card/95 pt-[env(safe-area-inset-top)] backdrop-blur-md"
+        className={cn(
+          "sticky top-0 z-20 pt-[env(safe-area-inset-top)]",
+          chrome ? "bg-card" : "bg-card/95 backdrop-blur-md",
+        )}
       >
-        <header className="px-5 pb-3 pt-2" data-slot="app-header">
+        <header className={cn("px-5 pt-2", chrome ? "pb-0" : "pb-3")} data-slot="app-header">
           <BrandMark size="compact" />
-          {headerExtra}
-          {headerExtra ? <h1 className="sr-only">{title}</h1> : null}
           {backHref ? <ChromeBackLink href={backHref} label={backLabel} /> : null}
-          {headerExtra && titleAside ? <div className="mt-2">{titleAside}</div> : null}
-          {headerExtra ? null : eyebrow ? (
-            <p className={cn("type-eyebrow", backHref ? "text-muted-foreground" : "mt-3 text-primary")}>
+          {eyebrow ? (
+            <p
+              className={cn(
+                "type-eyebrow",
+                backHref ? "text-muted-foreground" : "mt-3 text-primary",
+                eyebrowMuted && "!text-muted-foreground",
+              )}
+            >
               {eyebrow}
             </p>
           ) : null}
-          {headerExtra ? null : titleAside ? (
+          {titleAside ? (
             <div
               className={cn(
                 "flex flex-wrap items-center gap-x-2 gap-y-1",
@@ -87,6 +95,7 @@ export function AppShell({
             <h1 className={cn("type-title text-foreground", !eyebrow && !backHref && "mt-2")}>{title}</h1>
           )}
         </header>
+        {chrome ? <div data-slot="shell-chrome">{chrome}</div> : null}
         {status}
       </div>
       <main className={cn("min-w-0 flex-1 px-4 pt-4", footer ? "pb-20" : hideNav ? "pb-10" : "pb-36")}>

@@ -1,7 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { WeekSwitcher } from "@/components/week-switcher";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
 import { addDays } from "./dates";
 import {
@@ -96,24 +95,6 @@ describe("open weeks", () => {
       }),
     ).toBe("2026-10-04");
     expect(PLAN_NEXT_WEEK_LABEL).toBe("Plan next week");
-  });
-
-  it("renders This week and Next week, with the date range on the active chip", () => {
-    const html = renderToStaticMarkup(
-      createElement(WeekSwitcher, {
-        role: "cooking",
-        cookingStartsOn: cookingStart,
-        planningStartsOn: "2026-10-04",
-        onSelect: () => undefined,
-      }),
-    );
-    expect(html).toContain('data-slot="week-switcher"');
-    expect(html).toContain("This week");
-    expect(html).toContain("Next week");
-    expect(html).toContain("Sep 27 – Oct 3");
-    expect(html).toContain('aria-selected="true"');
-    expect(html).toContain('aria-selected="false"');
-    expect(html).toContain("min-h-11");
   });
 
   it("names next week on the waiting card", () => {

@@ -193,6 +193,8 @@ describe("week chrome markup", () => {
         showShoppingList: true,
         firstMeal: { id: "tue", title: "Lemon roast chicken", weekday: "Tuesday" },
         onSelect: () => undefined,
+        onStep: () => false,
+        planNext: null,
       }),
     );
     expect(both).toContain("Open shopping list");
@@ -216,6 +218,8 @@ describe("week chrome markup", () => {
         showShoppingList: false,
         firstMeal: { id: "tue", title: "Tacos", weekday: "Tuesday" },
         onSelect: () => undefined,
+        onStep: () => false,
+        planNext: null,
       }),
     );
     expect(mealOnly).not.toContain("Open shopping list");

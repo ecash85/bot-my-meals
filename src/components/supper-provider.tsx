@@ -33,6 +33,7 @@ import {
 import { getPublicSupabaseConfig, isSupabaseConfigured } from "@/lib/config";
 import { mealRecipeKey, savedMealForKey, savedMealRequestActive } from "@/lib/saved-meals";
 import { planningTargetStarts, scopeForMeal, scopeForRole } from "@/lib/open-weeks";
+import type { ViewedWeekSelection } from "@/lib/week-navigator";
 import { PASSWORD_MIN_LENGTH, passwordResetRedirectUrl } from "@/lib/login";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -92,7 +93,9 @@ type SupperContextValue = {
   session: Session | null;
   snapshot: HouseholdSnapshot | null;
   viewedRole: WeekRole;
+  viewedWeek: ViewedWeekSelection;
   setViewedRole: (role: WeekRole) => void;
+  setViewedWeek: (selection: ViewedWeekSelection) => void;
   error: string | null;
   refresh: () => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
@@ -151,7 +154,9 @@ function createSetupContext(): SupperContextValue {
     session: null,
     snapshot: null,
     viewedRole: "cooking",
+    viewedWeek: { kind: "cooking" },
     setViewedRole: () => undefined,
+    setViewedWeek: () => undefined,
     error: null,
     refresh: async () => {},
     signUpWithPassword: async () => setupUnavailable(),
@@ -201,8 +206,9 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot | null>(null);
-  const [viewedRole, setViewedRoleState] = useState<WeekRole>("cooking");
+  const [viewedWeek, setViewedWeekState] = useState<ViewedWeekSelection>({ kind: "cooking" });
   const viewedRoleRef = useRef<WeekRole>("cooking");
+  const viewedRole: WeekRole = viewedWeek.kind === "planning" ? "planning" : "cooking";
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const baseRef = useRef<HouseholdSnapshot | null>(null);
@@ -262,10 +268,17 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  const setViewedRole = useCallback((role: WeekRole) => {
-    viewedRoleRef.current = role;
-    setViewedRoleState(role);
+  const setViewedWeek = useCallback((selection: ViewedWeekSelection) => {
+    viewedRoleRef.current = selection.kind === "planning" ? "planning" : "cooking";
+    setViewedWeekState(selection);
   }, []);
+
+  const setViewedRole = useCallback(
+    (role: WeekRole) => {
+      setViewedWeek({ kind: role });
+    },
+    [setViewedWeek],
+  );
 
   const run = async <T,>(fn: () => Promise<T> | T): Promise<T> => {
     setError(null);
@@ -399,7 +412,9 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
       session,
       snapshot,
       viewedRole,
+      viewedWeek,
       setViewedRole,
+      setViewedWeek,
       error,
       refresh,
       bootstrapHousehold: (input) =>
@@ -814,14 +829,16 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           async () => {
             const client = createSupabaseBrowserClient();
             if (!client) throw new Error("Not signed in");
-            return supabaseRequestSavedMeal(client, current, recipeKey);
+            const result = await supabaseRequestSavedMeal(client, current, recipeKey);
+            if (result === "requested") setViewedWeek({ kind: "planning" });
+            return result;
           },
         );
       },
     }),
     // refresh/run close over the latest session and snapshot on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, session, snapshot, viewedRole, setViewedRole, error],
+    [ready, session, snapshot, viewedRole, viewedWeek, setViewedRole, setViewedWeek, error],
   );
 
   return (

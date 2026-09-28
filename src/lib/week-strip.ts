@@ -69,7 +69,7 @@ export type NightCardFocusTarget = {
   focus: (options?: FocusOptions) => void;
 };
 
-/** Scroll the existing meal card into view. Stays on This week — no route change. */
+/** Scroll the night's card into view on the active week. No route change. */
 export function focusNightCard(
   mealId: string,
   lookup: (id: string) => NightCardFocusTarget | null,

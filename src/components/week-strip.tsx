@@ -31,7 +31,7 @@ export function WeekStrip({
     <div
       data-slot="week-strip"
       data-locked={locked ? "true" : "false"}
-      className="-mx-4 overflow-x-auto px-px py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="overflow-hidden px-px py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div role="group" aria-label="Jump to a night" className="flex w-max min-w-full gap-2">
         {cells.map((cell) => {

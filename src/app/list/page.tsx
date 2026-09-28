@@ -13,6 +13,7 @@ import { useViewedWeek } from "@/components/use-viewed-week";
 import { Button } from "@/components/ui/button";
 import { useOptimisticValue } from "@/components/use-optimistic-value";
 import { formatWeekEyebrow } from "@/lib/dates";
+import { PAST_TITLES_ONLY } from "@/lib/week-navigator";
 import { shoppingListTitle, weekHomeTitle } from "@/lib/open-weeks";
 import { isNightOff } from "@/lib/lock";
 import {
@@ -38,9 +39,32 @@ export default function ListPage() {
 
 function ListBody() {
   const { snapshot, toggleItem, closeShoppingPrompt } = useSupper();
-  const { role, scope } = useViewedWeek();
+  const { role, scope, past } = useViewedWeek();
   const [pendingClose, setPendingClose] = useState<"done" | "dismissed" | null>(null);
-  if (!snapshot || !scope) {
+  if (!snapshot) {
+    return (
+      <AppShell title="Shopping list">
+        <p className="type-body text-muted-foreground">{LIST_NO_HOUSEHOLD}</p>
+      </AppShell>
+    );
+  }
+
+  if (past) {
+    return (
+      <AppShell
+        title="Shopping list"
+        eyebrow={formatWeekEyebrow(past.startsOn)}
+        backHref="/week"
+        backLabel={formatWeekEyebrow(past.startsOn)}
+      >
+        <p data-slot="past-week-list" className="type-body text-muted-foreground">
+          {PAST_TITLES_ONLY}
+        </p>
+      </AppShell>
+    );
+  }
+
+  if (!scope) {
     return (
       <AppShell title="Shopping list">
         <p className="type-body text-muted-foreground">{LIST_NO_HOUSEHOLD}</p>
