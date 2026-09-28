@@ -8,6 +8,7 @@ import { WeekStrip } from "@/components/week-strip";
 import { UNLOCK_WEEK_CONFIRM } from "./lock-success";
 import type { Meal, Vote } from "./types";
 import {
+  nightHasStripMeal,
   nightStaysLocked,
   showFirstMealRow,
   showOpenShoppingList,
@@ -15,10 +16,11 @@ import {
   upcomingDinner,
 } from "./week-chrome";
 
+const startsOn = "2026-09-27";
 const nights = [
-  { id: "sun", nightDate: "2026-09-27" },
-  { id: "mon", nightDate: "2026-09-28" },
-  { id: "tue", nightDate: "2026-09-29" },
+  { id: "sun", nightDate: "2026-09-27", hasMeal: true },
+  { id: "mon", nightDate: "2026-09-28", hasMeal: true },
+  { id: "tue", nightDate: "2026-09-29", hasMeal: true },
 ];
 
 function meal(id: string, nightDate: string, title: string): Meal {
@@ -106,6 +108,35 @@ describe("week chrome lock rules", () => {
     expect(upcomingDinner(meals, removed, "2026-09-27")?.title).toBe("Tacos");
     expect(upcomingDinner(meals, [], "2026-09-28")?.title).toBe("Tacos");
     expect(upcomingDinner(meals, [], "2026-09-30")).toBeUndefined();
+    expect(nightHasStripMeal(meals[0], [])).toBe(true);
+    expect(nightHasStripMeal(meals[1], [])).toBe(false);
+    expect(nightHasStripMeal(meals[0], removed)).toBe(false);
+    expect(
+      nightHasStripMeal(meals[2], [
+        {
+          id: "swap",
+          householdId: "h",
+          mealId: "tue",
+          membershipId: "a",
+          choice: "swap",
+          note: "",
+          updatedAt: "2026-09-27T00:00:00.000Z",
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      nightHasStripMeal(meals[2], [
+        {
+          id: "add",
+          householdId: "h",
+          mealId: "tue",
+          membershipId: "a",
+          choice: "request_new_meal",
+          note: "",
+          updatedAt: "2026-09-27T00:00:00.000Z",
+        },
+      ]),
+    ).toBe(false);
     expect(
       showFirstMealRow({
         weekStatus: "locked",
@@ -127,6 +158,7 @@ describe("week chrome markup", () => {
   it("renders one locked chip path, equal strip cells, and stacked rows without a See recipes prefix", () => {
     const strip = renderToStaticMarkup(
       createElement(WeekStrip, {
+        startsOn,
         nights,
         selectedMealId: "mon",
         todayIso: "2026-09-28",
@@ -152,6 +184,7 @@ describe("week chrome markup", () => {
 
     const both = renderToStaticMarkup(
       createElement(WeekChromeView, {
+        startsOn,
         nights,
         selectedMealId: "mon",
         todayIso: "2026-09-28",
@@ -174,6 +207,7 @@ describe("week chrome markup", () => {
 
     const mealOnly = renderToStaticMarkup(
       createElement(WeekChromeView, {
+        startsOn,
         nights,
         selectedMealId: null,
         todayIso: "2026-09-28",

@@ -37,6 +37,7 @@ import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from
 import { isPendingBotFill, lockedDinnerTap } from "@/lib/post-lock-waiting";
 import { recipeNightsForWeek } from "@/lib/recipes";
 import {
+  nightHasStripMeal,
   nightStaysLocked,
   showFirstMealRow,
   showOpenShoppingList,
@@ -103,15 +104,24 @@ function WeekBallot() {
           weekday: weekdayLabelFromNight(dinner.nightDate),
         }
       : null;
-  const mutedDates = nights
-    .filter((meal) =>
-      stripCellMuted({
-        weekStatus: snapshot.week.status,
-        nightDate: meal.nightDate,
-        editableFrom: snapshot.week.editableFrom,
-      }),
+  const stripNights = nights.map((meal) => ({
+    id: meal.id,
+    nightDate: meal.nightDate,
+    hasMeal: nightHasStripMeal(meal, snapshot.votes, snapshot.memberships),
+  }));
+  const mutedDates = stripNights
+    .filter(
+      (night) =>
+        night.hasMeal &&
+        stripCellMuted({
+          weekStatus: snapshot.week.status,
+          nightDate: night.nightDate,
+          editableFrom: snapshot.week.editableFrom,
+        }),
     )
-    .map((meal) => meal.nightDate);
+    .map((night) => night.nightDate);
+  const todayMealId =
+    stripNights.find((night) => night.hasMeal && night.nightDate === todayIso)?.id ?? null;
 
   const act = async (mealId: string, choice: VoteChoice, note?: string) => {
     try {
@@ -147,10 +157,9 @@ function WeekBallot() {
             </div>
           ) : null}
           <WeekChrome
-            nights={nights}
-            selectedMealId={
-              selectedNightId ?? nights.find((meal) => meal.nightDate === todayIso)?.id ?? null
-            }
+            startsOn={snapshot.week.startsOn}
+            nights={stripNights}
+            selectedMealId={selectedNightId ?? todayMealId}
             todayIso={todayIso}
             locked={locked}
             mutedDates={mutedDates}

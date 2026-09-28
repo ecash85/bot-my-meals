@@ -15,6 +15,7 @@ export type WeekChromeMeal = {
 };
 
 export function WeekChrome({
+  startsOn,
   nights,
   selectedMealId,
   todayIso,
@@ -25,6 +26,7 @@ export function WeekChrome({
   onSelect,
   onHeight,
 }: {
+  startsOn: string;
   nights: readonly WeekStripNight[];
   selectedMealId: string | null;
   todayIso: string;
@@ -50,6 +52,7 @@ export function WeekChrome({
   return (
     <WeekChromeView
       rootRef={ref}
+      startsOn={startsOn}
       nights={nights}
       selectedMealId={selectedMealId}
       todayIso={todayIso}
@@ -63,6 +66,7 @@ export function WeekChrome({
 }
 
 export function WeekChromeView({
+  startsOn,
   nights,
   selectedMealId,
   todayIso,
@@ -73,6 +77,7 @@ export function WeekChromeView({
   onSelect,
   rootRef,
 }: {
+  startsOn: string;
   nights: readonly WeekStripNight[];
   selectedMealId: string | null;
   todayIso: string;
@@ -98,6 +103,7 @@ export function WeekChromeView({
         )}
       >
         <WeekStrip
+          startsOn={startsOn}
           nights={nights}
           selectedMealId={selectedMealId}
           todayIso={todayIso}

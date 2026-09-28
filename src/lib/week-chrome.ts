@@ -1,6 +1,6 @@
-import { isNightOff } from "./lock";
+import { isNightOff, nightLifecycle } from "./lock";
 import { recipeNightsForWeek } from "./recipes";
-import type { Meal, ShoppingPrompt, Vote, WeekStatus } from "./types";
+import type { Meal, Membership, ShoppingPrompt, Vote, WeekStatus } from "./types";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -48,6 +48,28 @@ export function nightStaysLocked(input: {
     }
     default: {
       const _exhaustive: never = input.weekStatus;
+      return _exhaustive;
+    }
+  }
+}
+
+/** A strip night is selectable only when it still has a dinner. Removed, blank, and pending nights stay visible but inert. */
+export function nightHasStripMeal(
+  meal: Pick<Meal, "id" | "title">,
+  votes: Vote[],
+  memberships?: Membership[],
+): boolean {
+  const lifecycle = nightLifecycle(meal, votes, memberships);
+  switch (lifecycle) {
+    case "passive":
+    case "swapped":
+    case "proposed":
+      return true;
+    case "removed":
+    case "request_new_meal":
+      return false;
+    default: {
+      const _exhaustive: never = lifecycle;
       return _exhaustive;
     }
   }

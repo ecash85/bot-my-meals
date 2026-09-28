@@ -1,35 +1,54 @@
+import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { WeekStrip } from "@/components/week-strip";
 import { focusNightCard, nightCardAnchorId, weekStripCells } from "./week-strip";
 
 const crossMonth = [
-  { id: "sun", nightDate: "2026-09-27" },
-  { id: "mon", nightDate: "2026-09-28" },
-  { id: "tue", nightDate: "2026-09-29" },
-  { id: "wed", nightDate: "2026-09-30" },
-  { id: "thu", nightDate: "2026-10-01" },
-  { id: "fri", nightDate: "2026-10-02" },
-  { id: "sat", nightDate: "2026-10-03" },
+  { id: "sun", nightDate: "2026-09-27", hasMeal: true },
+  { id: "mon", nightDate: "2026-09-28", hasMeal: true },
+  { id: "tue", nightDate: "2026-09-29", hasMeal: true },
+  { id: "wed", nightDate: "2026-09-30", hasMeal: true },
+  { id: "thu", nightDate: "2026-10-01", hasMeal: true },
+  { id: "fri", nightDate: "2026-10-02", hasMeal: true },
+  { id: "sat", nightDate: "2026-10-03", hasMeal: true },
 ];
 
 describe("weekStripCells", () => {
   it("builds seven compact cells and shows the month when it flips", () => {
-    const cells = weekStripCells(crossMonth);
+    const cells = weekStripCells("2026-09-27", crossMonth);
     expect(cells).toHaveLength(7);
     expect(cells.map((cell) => cell.letter)).toEqual(["S", "M", "T", "W", "T", "F", "S"]);
     expect(cells.map((cell) => cell.day)).toEqual([27, 28, 29, 30, 1, 2, 3]);
     expect(cells.map((cell) => cell.month)).toEqual(["Sep", null, null, null, "Oct", null, null]);
+    expect(cells.every((cell) => cell.hasMeal)).toBe(true);
   });
 
   it("shows the month only on the first cell when the week stays in one month", () => {
-    const cells = weekStripCells([
-      { id: "sun", nightDate: "2026-10-04" },
-      { id: "mon", nightDate: "2026-10-05" },
-      { id: "sat", nightDate: "2026-10-10" },
+    const cells = weekStripCells("2026-10-04", [
+      { id: "sun", nightDate: "2026-10-04", hasMeal: true },
+      { id: "mon", nightDate: "2026-10-05", hasMeal: true },
+      { id: "sat", nightDate: "2026-10-10", hasMeal: true },
     ]);
-    expect(cells.map((cell) => cell.month)).toEqual(["Oct", null, null]);
-    expect(cells.map((cell) => cell.day)).toEqual([4, 5, 10]);
+    expect(cells).toHaveLength(7);
+    expect(cells.map((cell) => cell.month)).toEqual(["Oct", null, null, null, null, null, null]);
+    expect(cells.map((cell) => cell.day)).toEqual([4, 5, 6, 7, 8, 9, 10]);
+    expect(cells.map((cell) => cell.hasMeal)).toEqual([true, true, false, false, false, false, true]);
+    expect(cells.map((cell) => cell.mealId)).toEqual(["sun", "mon", null, null, null, null, "sat"]);
+  });
+
+  it("keeps empty and pending nights in the seven days without making them selectable", () => {
+    const cells = weekStripCells("2026-09-27", [
+      { id: "mon", nightDate: "2026-09-28", hasMeal: true },
+      { id: "thu", nightDate: "2026-10-01", hasMeal: false },
+      { id: "fri", nightDate: "2026-10-02", hasMeal: true },
+    ]);
+    expect(cells.map((cell) => cell.letter)).toEqual(["S", "M", "T", "W", "T", "F", "S"]);
+    expect(cells.map((cell) => cell.hasMeal)).toEqual([false, true, false, false, false, true, false]);
+    expect(cells.map((cell) => cell.mealId)).toEqual([null, "mon", null, null, null, "fri", null]);
+    expect(cells.map((cell) => cell.month)).toEqual(["Sep", null, null, null, "Oct", null, null]);
   });
 });
 
@@ -81,12 +100,71 @@ describe("This week strip", () => {
     expect(strip).not.toContain("py-3");
     expect(strip).not.toContain("h-3");
     expect(strip).toContain("flex-1");
+    expect(strip).toContain('data-empty="true"');
+    expect(strip).toContain('data-selectable="false"');
+    expect(strip).toContain("font-medium");
     expect(strip).toContain('type="button"');
+    expect(week).toContain("nightHasStripMeal");
+    expect(week).toContain("startsOn={snapshot.week.startsOn}");
     expect(strip).not.toContain("<Lock");
     expect(strip).not.toContain("lucide-react");
     expect(strip).not.toContain("href=");
     expect(strip).not.toContain("Calendar");
     expect(card).toMatch(/>\s*Swap\s*</);
     expect(card).toMatch(/>\s*Remove\s*</);
+  });
+
+  it("renders all seven days and only meal nights as tappable cells", () => {
+    const html = renderToStaticMarkup(
+      createElement(WeekStrip, {
+        startsOn: "2026-09-27",
+        nights: [
+          { id: "sun", nightDate: "2026-09-27", hasMeal: false },
+          { id: "mon", nightDate: "2026-09-28", hasMeal: true },
+          { id: "wed", nightDate: "2026-09-30", hasMeal: true },
+        ],
+        selectedMealId: "sun",
+        todayIso: "2026-09-27",
+        mutedDates: ["2026-09-27"],
+        onSelect: () => undefined,
+      }),
+    );
+    expect(html.match(/data-slot="week-strip-cell"/g)).toHaveLength(7);
+    expect(html.match(/<button/g)).toHaveLength(2);
+    expect(html.match(/data-empty="true"/g)).toHaveLength(5);
+    expect(html.match(/data-selectable="true"/g)).toHaveLength(2);
+    expect(html).toContain('data-meal-id="mon"');
+    expect(html).toContain('data-meal-id="wed"');
+    expect(html).not.toContain('data-meal-id="sun"');
+    expect(html).not.toContain('data-today="true"');
+    expect(html).not.toContain('data-selected="true"');
+    expect(html).not.toContain("bg-primary");
+    expect(html).toContain("font-medium");
+    expect(html).toContain("font-semibold");
+    expect(html).not.toContain("read only");
+  });
+
+  it("keeps today and past-lock states on meal nights only", () => {
+    const html = renderToStaticMarkup(
+      createElement(WeekStrip, {
+        startsOn: "2026-09-27",
+        nights: [
+          { id: "sun", nightDate: "2026-09-27", hasMeal: true },
+          { id: "mon", nightDate: "2026-09-28", hasMeal: true },
+          { id: "tue", nightDate: "2026-09-29", hasMeal: false },
+        ],
+        selectedMealId: "mon",
+        todayIso: "2026-09-28",
+        mutedDates: ["2026-09-27"],
+        onSelect: () => undefined,
+      }),
+    );
+    expect(html).toContain('data-today="true"');
+    expect(html).toContain("bg-primary");
+    expect(html).toContain('data-past="true"');
+    expect(html).toContain("Sun · Sep 27, read only");
+    expect(html).toContain('data-selected="true"');
+    expect(html).toContain('data-empty="true"');
+    expect(html).not.toContain(", locked");
   });
 });
