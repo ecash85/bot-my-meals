@@ -16,6 +16,10 @@
   "compatibility_date": "2026-09-09",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": true,
+  // Keep dashboard plain-text vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  // across `wrangler deploy` and `wrangler versions upload`. Do not commit their values.
+  // Top-level only — Wrangler rejects keep_vars inside env.*.
+  "keep_vars": true,
   // Optional Worker secrets (dashboard or `wrangler secret put`). Never NEXT_PUBLIC_.
   // BOT_WAKE_WEBHOOK_URL and BOT_WAKE_WEBHOOK_KEY wake the household Grok Bot.
   // CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN let House → Wake your Bot save those two.
