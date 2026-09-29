@@ -118,7 +118,9 @@ describe("Clear Sky recipe craft", () => {
     expect(block).toContain("text-foreground");
     expect(block).toContain("{servings}");
     expect(block).toContain("font-mono");
-    expect(meal).toContain("<RecipeBlock recipe={recipe} servings={meal.servings} />");
+    expect(meal).toContain("<RecipeBlock");
+    expect(meal).toContain("servings={meal.servings}");
+    expect(meal).toContain("dinnerTime: snapshot.household.dinnerTime");
     expect(meal).toContain("EMPTY_DAY_TITLE");
     expect(meal).toContain("No action — dinner stands");
     expect(meal).toContain("The new dinner stands until someone swaps or removes it.");

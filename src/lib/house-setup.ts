@@ -163,6 +163,7 @@ export function grokBotPastePrompt(input: {
     "Wake your Bot is required before Create this week's meals. Paste the Webhook URL in House → Wake your Bot. There is no Skip. Week and plan changes wake the bot. Write ballot, recipes, and the shopping list back to the site, and stay quiet if nothing changed.",
     "On each wake, read GET /api/bot/status. Do the work when needs_work is true on any open week, and stay silent when nothing changed.",
     "fill_pending means this locked week still needs recipes or a shopping list. Write those, and skip a list when nothing needs buying.",
+    "When you write a recipe, set prep_minutes, cook_minutes, rest_minutes, and ahead_steps. ahead_steps is a JSON array of label and lead_minutes before dinner for dry brine, inject, rub, marinate, thaw, or a smoke that starts the previous evening. Dinner time is households.dinner_time, default 18:00.",
     "Keep a webhook routine named Wake on app event. On wake, sync this household (ballot, recipes, shopping list, setup) from the app, and stay quiet if nothing changed.",
     "For a next-week ballot, use that week's night_headcounts and special_instructions. Empty instructions are fine. Do not change House plate defaults.",
     "Never invent grocery prices. Never claim Smith's cart adds.",

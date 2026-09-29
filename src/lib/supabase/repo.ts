@@ -43,6 +43,7 @@ import { parseMealHistory, todayInTimeZone } from "@/lib/meal-history";
 import { splitOpenWeeks } from "@/lib/open-weeks";
 import { parseSavedMeals } from "@/lib/saved-meals";
 import { redactUntilLocked } from "@/lib/visibility";
+import { parseAheadStepsColumn } from "@/lib/cook-timing";
 import { parseEditableFrom, parseShoppingPrompt } from "@/lib/week-chrome";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -300,6 +301,8 @@ export async function fetchSupabaseSnapshot(
     servings: row.servings,
     prepMinutes: row.prep_minutes,
     cookMinutes: row.cook_minutes,
+    restMinutes: typeof row.rest_minutes === "number" ? row.rest_minutes : null,
+    aheadSteps: parseAheadStepsColumn(row.ahead_steps),
     steps: row.steps ?? [],
     recipeKey:
       typeof row.recipe_key === "string" && row.recipe_key.trim() ? row.recipe_key.trim() : null,
@@ -365,6 +368,10 @@ export async function fetchSupabaseSnapshot(
         coupleSize: householdRow.couple_size,
       }),
       timezone: householdRow.timezone,
+      dinnerTime:
+        typeof householdRow.dinner_time === "string" && householdRow.dinner_time.trim()
+          ? String(householdRow.dinner_time).slice(0, 5)
+          : null,
       setupStep: clampHouseSetupStep(householdRow.setup_step ?? 8),
       weeklyBudgetCents:
         typeof householdRow.weekly_budget_cents === "number"
@@ -500,6 +507,15 @@ export async function supabaseProposeReplacement(
   await client.from("votes").delete().eq("meal_id", mealId);
   await client.from("recipes").delete().eq("meal_id", mealId);
 
+  const timingColumns: Record<string, unknown> = {};
+  if (proposal.restMinutes != null) timingColumns.rest_minutes = proposal.restMinutes;
+  if (proposal.aheadSteps != null) {
+    timingColumns.ahead_steps = proposal.aheadSteps.map((step) => ({
+      label: step.label,
+      lead_minutes: step.leadMinutes,
+    }));
+  }
+
   const { data: recipe, error: recipeError } = await client
     .from("recipes")
     .insert({
@@ -509,6 +525,7 @@ export async function supabaseProposeReplacement(
       prep_minutes: Math.min(15, proposal.prepMinutes),
       cook_minutes: Math.max(0, proposal.prepMinutes - 15),
       steps: proposal.steps?.length ? proposal.steps : ["Cook and serve."],
+      ...timingColumns,
     })
     .select("id")
     .single();

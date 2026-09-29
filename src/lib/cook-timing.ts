@@ -1,0 +1,433 @@
+import { addDays, WEEKDAY_LABELS } from "./dates";
+import { formatDuration } from "./duration";
+import type { AheadStep, Meal, Recipe } from "./types";
+
+/**
+ * Local serve time when `households.dinner_time` is missing.
+ * Change this constant to move the fallback. Per-house overrides live in that column.
+ */
+export const DEFAULT_DINNER_TIME = "18:00";
+
+/** A start before this hour (house local) is called out the previous evening. */
+export const EARLY_START_HOUR = 9;
+
+const FALLBACK_TIME_ZONE = "America/Los_Angeles";
+
+/** Overnight with no explicit hour count. Lands on the previous evening for a 6 PM dinner. */
+const DEFAULT_OVERNIGHT_LEAD_MINUTES = 18 * 60;
+
+const SMOKE_HINT =
+  /\b(smoker|pellet grill|on the smoker|pork shoulder|pulled pork|boston butt|brisket|short ribs?)\b|\bsmoke\b/i;
+
+export type CookPlan = {
+  prepMinutes: number;
+  cookMinutes: number;
+  restMinutes: number;
+  totalMinutes: number;
+  durationLabel: string | null;
+  breakdown: string | null;
+  startByLabel: string | null;
+  /** Short reminder of overnight steps, shown on the dinner itself. */
+  aheadLine: string | null;
+  notices: PrepNotice[];
+};
+
+export type PrepNotice = {
+  mealId: string;
+  /** House-local date this line belongs on. Often the day before dinner. */
+  showOn: string;
+  text: string;
+};
+
+export type CookPlanInput = {
+  meal: Pick<Meal, "id" | "title" | "nightDate" | "prepMinutes">;
+  recipe?: Pick<
+    Recipe,
+    "prepMinutes" | "cookMinutes" | "restMinutes" | "aheadSteps" | "steps"
+  > | null;
+  timeZone: string;
+  dinnerTime?: string | null;
+};
+
+export function mealCookPlan(input: CookPlanInput): CookPlan {
+  const durations = resolvedDurations(input.recipe, input.meal.prepMinutes);
+  const total = durations.prepMinutes + durations.cookMinutes + durations.restMinutes;
+  if (total <= 0 && durations.aheadSteps.length === 0) {
+    return emptyPlan(durations);
+  }
+
+  const zone = resolveTimeZone(input.timeZone);
+  const dinner = zonedDateTime(input.meal.nightDate, resolveDinnerTime(input.dinnerTime), zone);
+  const start = total > 0 ? new Date(dinner.getTime() - total * 60_000) : null;
+  const smoker = mentionsSmoker(input.meal.title, input.recipe?.steps ?? []);
+  const notices = prepNotices({
+    mealId: input.meal.id,
+    title: input.meal.title,
+    nightDate: input.meal.nightDate,
+    dinner,
+    start,
+    aheadSteps: durations.aheadSteps,
+    smoker,
+    timeZone: zone,
+  });
+
+  return {
+    ...durations,
+    totalMinutes: total,
+    durationLabel: total > 0 ? formatDuration(total) : null,
+    breakdown: breakdownLabel(durations),
+    startByLabel: start ? formatStartBy(start, input.meal.nightDate, zone) : null,
+    aheadLine: aheadLine(durations.aheadSteps),
+    notices,
+  };
+}
+
+function aheadLine(steps: AheadStep[]): string | null {
+  if (steps.length === 0) return null;
+  return `Prep ahead: ${steps.map((step) => step.label).join(", ")}`;
+}
+
+export function resolvedDurations(
+  recipe: CookPlanInput["recipe"],
+  mealPrepMinutes: number,
+): {
+  prepMinutes: number;
+  cookMinutes: number;
+  restMinutes: number;
+  aheadSteps: AheadStep[];
+} {
+  if (!recipe) {
+    return {
+      prepMinutes: nonNegative(mealPrepMinutes),
+      cookMinutes: 0,
+      restMinutes: 0,
+      aheadSteps: [],
+    };
+  }
+
+  const prepMinutes = nonNegative(recipe.prepMinutes);
+  const storedCook = nonNegative(recipe.cookMinutes);
+  const parsedCook = storedCook > 0 ? 0 : parseCookMinutes(recipe.steps ?? []);
+  const cookMinutes =
+    storedCook > 0
+      ? storedCook
+      : parsedCook != null && parsedCook >= 60 && parsedCook > prepMinutes
+        ? parsedCook
+        : 0;
+  const restMinutes =
+    typeof recipe.restMinutes === "number" && recipe.restMinutes >= 0
+      ? Math.round(recipe.restMinutes)
+      : (parseRestMinutes(recipe.steps ?? []) ?? 0);
+  const aheadSteps =
+    recipe.aheadSteps == null ? parseAheadFromSteps(recipe.steps ?? []) : recipe.aheadSteps;
+
+  return { prepMinutes, cookMinutes, restMinutes, aheadSteps };
+}
+
+export function resolveDinnerTime(value: string | null | undefined): string {
+  if (!value) return DEFAULT_DINNER_TIME;
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return DEFAULT_DINNER_TIME;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return DEFAULT_DINNER_TIME;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** Column value from Postgres. Null means unset, so step text may fill it in. */
+export function parseAheadStepsColumn(value: unknown): AheadStep[] | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return null;
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const label = typeof row.label === "string" ? row.label.trim() : "";
+    const leadRaw = row.lead_minutes ?? row.leadMinutes;
+    const lead = typeof leadRaw === "number" ? leadRaw : Number(leadRaw);
+    if (!label || !Number.isFinite(lead) || lead <= 0) return [];
+    return [{ label, leadMinutes: Math.round(lead) }];
+  });
+}
+
+export function zonedDateTime(isoDate: string, time: string, timeZone: string): Date {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const [hour, minute] = resolveDinnerTime(time).split(":").map(Number);
+  const zone = resolveTimeZone(timeZone);
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const offset = timeZoneOffsetMs(utcGuess, zone);
+  const first = new Date(utcGuess.getTime() - offset);
+  const offset2 = timeZoneOffsetMs(first, zone);
+  return new Date(utcGuess.getTime() - offset2);
+}
+
+export function formatClock(date: Date, timeZone: string): string {
+  const parts = zonedParts(date, resolveTimeZone(timeZone));
+  const hour12 = parts.hour % 12 || 12;
+  const minute = String(parts.minute).padStart(2, "0");
+  const period = parts.hour >= 12 ? "PM" : "AM";
+  return `${hour12}:${minute} ${period}`;
+}
+
+function emptyPlan(durations: ReturnType<typeof resolvedDurations>): CookPlan {
+  return {
+    ...durations,
+    totalMinutes: 0,
+    durationLabel: null,
+    breakdown: null,
+    startByLabel: null,
+    aheadLine: null,
+    notices: [],
+  };
+}
+
+function breakdownLabel(durations: ReturnType<typeof resolvedDurations>): string | null {
+  const bits = [
+    durations.prepMinutes > 0 ? `Prep ${formatDuration(durations.prepMinutes)}` : null,
+    durations.cookMinutes > 0 ? `Cook ${formatDuration(durations.cookMinutes)}` : null,
+    durations.restMinutes > 0 ? `Rest ${formatDuration(durations.restMinutes)}` : null,
+  ].filter((bit): bit is string => Boolean(bit));
+  if (bits.length < 2) return null;
+  return bits.join(" · ");
+}
+
+function formatStartBy(start: Date, dinnerDate: string, timeZone: string): string {
+  const clock = formatClock(start, timeZone);
+  const localDate = zonedIsoDate(start, timeZone);
+  if (localDate === dinnerDate) return `Start by ${clock}`;
+  const weekday = WEEKDAY_LABELS[weekdayIndex(localDate)];
+  return `Start by ${weekday} ${clock}`;
+}
+
+function prepNotices(input: {
+  mealId: string;
+  title: string;
+  nightDate: string;
+  dinner: Date;
+  start: Date | null;
+  aheadSteps: AheadStep[];
+  smoker: boolean;
+  timeZone: string;
+}): PrepNotice[] {
+  const buckets = new Map<string, { labels: string[]; start: Date | null }>();
+  const bucketFor = (showOn: string) => {
+    const existing = buckets.get(showOn);
+    if (existing) return existing;
+    const created = { labels: [] as string[], start: null as Date | null };
+    buckets.set(showOn, created);
+    return created;
+  };
+
+  if (input.start) {
+    const showOn = surfaceDate(input.start, input.timeZone);
+    if (showOn !== input.nightDate) bucketFor(showOn).start = input.start;
+  }
+
+  for (const step of input.aheadSteps) {
+    const when = new Date(input.dinner.getTime() - step.leadMinutes * 60_000);
+    const showOn = surfaceDate(when, input.timeZone);
+    if (showOn === input.nightDate) continue;
+    const bucket = bucketFor(showOn);
+    if (!bucket.labels.includes(step.label)) bucket.labels.push(step.label);
+  }
+
+  return [...buckets.entries()].flatMap(([showOn, bucket]) => {
+    const text = noticeText({
+      showOn,
+      dinnerDate: input.nightDate,
+      title: input.title,
+      labels: bucket.labels,
+      start: bucket.start,
+      smoker: input.smoker,
+      timeZone: input.timeZone,
+    });
+    if (!text) return [];
+    return [{ mealId: input.mealId, showOn, text }];
+  });
+}
+
+function noticeText(input: {
+  showOn: string;
+  dinnerDate: string;
+  title: string;
+  labels: string[];
+  start: Date | null;
+  smoker: boolean;
+  timeZone: string;
+}): string {
+  const mealRef =
+    addDays(input.showOn, 1) === input.dinnerDate
+      ? `tomorrow's ${sentenceTitle(input.title)}`
+      : `${WEEKDAY_LABELS[weekdayIndex(input.dinnerDate)]}'s ${sentenceTitle(input.title)}`;
+  const labels = input.labels.join(", ");
+  const clock = input.start ? formatClock(input.start, input.timeZone) : null;
+  const verb = input.smoker ? "start smoker" : "start";
+
+  if (labels && clock) return `Tonight: prep for ${mealRef}, ${labels}, ${verb} by ${clock}`;
+  if (labels) return `Tonight: prep for ${mealRef}, ${labels}`;
+  if (clock && input.smoker) return `Tonight: start smoker for ${mealRef} by ${clock}`;
+  if (clock) return `Tonight: start ${mealRef} by ${clock}`;
+  return "";
+}
+
+function surfaceDate(when: Date, timeZone: string): string {
+  const parts = zonedParts(when, timeZone);
+  const date = isoFromParts(parts);
+  if (parts.hour < EARLY_START_HOUR) return addDays(date, -1);
+  return date;
+}
+
+function mentionsSmoker(title: string, steps: string[]): boolean {
+  return SMOKE_HINT.test(`${title}\n${steps.join("\n")}`);
+}
+
+function sentenceTitle(title: string): string {
+  const trimmed = title.trim();
+  if (!trimmed) return "dinner";
+  const second = trimmed.charAt(1);
+  if (trimmed.charAt(0) !== trimmed.charAt(0).toLowerCase() && second === second.toLowerCase()) {
+    return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+  }
+  return trimmed;
+}
+
+function parseRestMinutes(steps: string[]): number | null {
+  for (const step of steps) {
+    const match = step.match(/\brest\b([^.]*)/i);
+    if (!match) continue;
+    const minutes = minutesFromPhrase(match[1] ?? "");
+    if (minutes != null && minutes > 0) return minutes;
+  }
+  return null;
+}
+
+function parseCookMinutes(steps: string[]): number | null {
+  let best: number | null = null;
+  for (const step of steps) {
+    if (/\brest\b/i.test(step) && !/\b(smoke|roast|braise|cook|simmer|bake)\b/i.test(step)) continue;
+    const minutes = minutesFromPhrase(step);
+    if (minutes == null || minutes < 60) continue;
+    if (
+      !/\b(smoke|smoker|roast|braise|cook|simmer|bake|grill|oven)\b/i.test(step) &&
+      minutes < 90
+    ) {
+      continue;
+    }
+    if (best == null || minutes > best) best = minutes;
+  }
+  return best;
+}
+
+function parseAheadFromSteps(steps: string[]): AheadStep[] {
+  const found: AheadStep[] = [];
+  for (const step of steps) {
+    if (!isAheadStep(step)) continue;
+    const label = aheadLabel(step);
+    if (!label) continue;
+    const explicit = minutesFromPhrase(step);
+    const leadMinutes =
+      explicit != null && explicit >= 60 ? explicit : DEFAULT_OVERNIGHT_LEAD_MINUTES;
+    if (!found.some((item) => item.label === label)) found.push({ label, leadMinutes });
+  }
+  return found;
+}
+
+function isAheadStep(step: string): boolean {
+  if (/\b(overnight|night before|dry[\s-]?brine|marinat|thaw)/i.test(step)) return true;
+  if (/\binject/i.test(step) && /\b(night|overnight|before|ahead|fridge)\b/i.test(step)) return true;
+  return false;
+}
+
+function aheadLabel(step: string): string | null {
+  const bits: string[] = [];
+  if (/dry[\s-]?brine/i.test(step)) bits.push("dry brine");
+  if (/inject/i.test(step)) bits.push("inject");
+  if (/\brub/i.test(step)) bits.push("rub");
+  if (/marinat/i.test(step)) bits.push("marinate");
+  if (/thaw/i.test(step)) bits.push("thaw");
+  if (bits.length) return bits.join(" + ");
+  if (/\b(overnight|night before)\b/i.test(step)) {
+    return /\bsmok/i.test(step) ? "overnight smoke" : "overnight prep";
+  }
+  return null;
+}
+
+function minutesFromPhrase(text: string): number | null {
+  const range = text.match(
+    /(\d+(?:\.\d+)?)\s*(?:–|-|to)\s*(\d+(?:\.\d+)?)\s*(hours|hrs|hr|minutes|mins|min)\b/i,
+  );
+  if (range) return toMinutes(Number(range[2]), range[3] ?? "");
+  const one = text.match(/(\d+(?:\.\d+)?)\s*(hours|hrs|hr|minutes|mins|min)\b/i);
+  if (!one) return null;
+  return toMinutes(Number(one[1]), one[2] ?? "");
+}
+
+function toMinutes(amount: number, unit: string): number | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return /hour|hr/i.test(unit) ? Math.round(amount * 60) : Math.round(amount);
+}
+
+function nonNegative(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value);
+}
+
+type ZonedParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function zonedParts(date: Date, timeZone: string): ZonedParts {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const hour = read("hour");
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day"),
+    hour: hour === 24 ? 0 : hour,
+    minute: read("minute"),
+    second: read("second"),
+  };
+}
+
+function timeZoneOffsetMs(instant: Date, timeZone: string): number {
+  const parts = zonedParts(instant, timeZone);
+  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  return asUtc - instant.getTime();
+}
+
+function zonedIsoDate(date: Date, timeZone: string): string {
+  return isoFromParts(zonedParts(date, resolveTimeZone(timeZone)));
+}
+
+function isoFromParts(parts: Pick<ZonedParts, "year" | "month" | "day">): string {
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+function weekdayIndex(iso: string): number {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function resolveTimeZone(timeZone: string): string {
+  const candidate = timeZone.trim() || FALLBACK_TIME_ZONE;
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(0);
+    return candidate;
+  } catch {
+    return FALLBACK_TIME_ZONE;
+  }
+}

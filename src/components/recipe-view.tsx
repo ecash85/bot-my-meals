@@ -1,3 +1,5 @@
+import { mealCookPlan, type CookPlanInput } from "@/lib/cook-timing";
+import { formatDuration } from "@/lib/duration";
 import { formatQuantity } from "@/lib/shopping";
 import type { Recipe } from "@/lib/types";
 
@@ -5,10 +7,12 @@ export function RecipeBlock({
   recipe,
   servings,
   title,
+  cook,
 }: {
   recipe?: Recipe;
   servings: number;
   title?: string;
+  cook?: Omit<CookPlanInput, "recipe">;
 }) {
   if (!recipe) {
     return (
@@ -25,16 +29,37 @@ export function RecipeBlock({
     );
   }
 
-  const minutes = recipe.prepMinutes + recipe.cookMinutes;
+  const plan = cook ? mealCookPlan({ ...cook, recipe }) : null;
+  const total =
+    plan?.totalMinutes ??
+    recipe.prepMinutes + recipe.cookMinutes + (typeof recipe.restMinutes === "number" ? recipe.restMinutes : 0);
+  const durationLabel = plan?.durationLabel ?? (total > 0 ? formatDuration(total) : null);
+  const breakdown = plan?.breakdown ?? null;
+  const startBy = plan?.startByLabel ?? null;
+  const ahead = plan?.aheadLine ?? null;
 
   return (
     <div data-slot="recipe-block" className="space-y-6">
       {title ? <h2 className="type-section">{title}</h2> : null}
+      {startBy ? (
+        <p data-slot="start-by" className="type-body font-semibold">
+          {startBy}
+        </p>
+      ) : null}
+      {ahead ? (
+        <p data-slot="ahead-line" className="type-meta -mt-4 text-muted-foreground">
+          {ahead}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <span className="type-chip inline-flex rounded-[var(--radius-chip)] bg-secondary px-2.5 py-1 text-foreground">
-          <span className="font-mono">{minutes}</span>
-          <span className="ml-1">min</span>
-        </span>
+        {durationLabel ? (
+          <span
+            data-slot="recipe-duration"
+            className="type-chip inline-flex rounded-[var(--radius-chip)] bg-secondary px-2.5 py-1 text-foreground"
+          >
+            <span className="font-mono">{durationLabel}</span>
+          </span>
+        ) : null}
         <span
           data-slot="recipe-servings"
           className="type-chip inline-flex rounded-[var(--radius-chip)] bg-secondary px-2.5 py-1 text-foreground"
@@ -49,6 +74,11 @@ export function RecipeBlock({
           )}
         </span>
       </div>
+      {breakdown ? (
+        <p data-slot="cook-breakdown" className="type-meta -mt-4 text-muted-foreground">
+          {breakdown}
+        </p>
+      ) : null}
       <div>
         <h3 className="type-eyebrow text-muted-foreground">Ingredients</h3>
         <ul className="mt-2 divide-y divide-border rounded-[14px] bg-card shadow-card">

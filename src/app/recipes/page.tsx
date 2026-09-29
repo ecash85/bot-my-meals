@@ -10,6 +10,7 @@ import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { useViewedWeek } from "@/components/use-viewed-week";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
+import { mealCookPlan } from "@/lib/cook-timing";
 import { formatWeekEyebrow, formatWeekRange, weekdayShortFromNight } from "@/lib/dates";
 import { todayInTimeZone } from "@/lib/meal-history";
 import { isNightOff } from "@/lib/lock";
@@ -143,6 +144,15 @@ function RecipesBody() {
         {nights.map((meal) => {
           const removed = removedMealIds.has(meal.id);
           const selected = firstMeal?.id === meal.id;
+          const plan = removed
+            ? null
+            : mealCookPlan({
+                meal,
+                recipe: scope.recipes.find((item) => item.mealId === meal.id),
+                timeZone: snapshot.household.timezone,
+                dinnerTime: snapshot.household.dinnerTime,
+              });
+          const timing = [plan?.durationLabel, plan?.startByLabel].filter(Boolean).join(" · ");
           return (
             <Link
               key={meal.id}
@@ -160,6 +170,11 @@ function RecipesBody() {
                 {weekdayShortFromNight(meal.nightDate)}
               </p>
               <h2 className="type-section mt-1">{removed ? EMPTY_DAY_TITLE : meal.title}</h2>
+              {timing ? (
+                <p data-slot="recipe-time" className="type-body mt-1 text-muted-foreground">
+                  {timing}
+                </p>
+              ) : null}
             </Link>
           );
         })}

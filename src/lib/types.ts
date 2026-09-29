@@ -66,6 +66,11 @@ export type Household = {
   coupleSize: number;
   nightHeadcounts: number[];
   timezone: string;
+  /**
+   * Local serve time `HH:MM`. Blank uses the 6:00 PM fallback in `cook-timing.ts`.
+   * Set `households.dinner_time` to change it for one house.
+   */
+  dinnerTime?: string | null;
   setupStep: number;
   weeklyBudgetCents: number | null;
   householdSize: number;
@@ -96,6 +101,12 @@ export type BallotRequest = {
   specialInstructions: string | null;
 };
 
+/** Overnight or early step. `leadMinutes` counts backward from dinner. */
+export type AheadStep = {
+  label: string;
+  leadMinutes: number;
+};
+
 export type Ingredient = {
   id: string;
   name: string;
@@ -110,6 +121,15 @@ export type Recipe = {
   servings: number;
   prepMinutes: number;
   cookMinutes: number;
+  /**
+   * Rest after the cook. Null when the column was never set — step text may fill it in.
+   * Zero means there is no rest.
+   */
+  restMinutes?: number | null;
+  /**
+   * Null when unset (step text may fill it in). An empty array means there is no ahead step.
+   */
+  aheadSteps?: AheadStep[] | null;
   steps: string[];
   ingredients: Ingredient[];
   /** Stable id Meal Ops may stamp. Blank means the saved-meal key is the title. */
@@ -220,6 +240,8 @@ export type MealProposalInput = {
   title: string;
   pitch: string;
   prepMinutes: number;
+  restMinutes?: number | null;
+  aheadSteps?: AheadStep[] | null;
   audience?: Audience;
   servings?: number;
   steps?: string[];
