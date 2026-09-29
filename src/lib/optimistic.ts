@@ -1,5 +1,5 @@
 import { voteNotePersists } from "@/lib/ballot";
-import { audienceFromHeadcount, headcountForNight, withDerivedNightSettings } from "@/lib/headcount";
+import { withDerivedNightSettings } from "@/lib/headcount";
 import { nightsPlannedFromHeadcounts } from "@/lib/house-setup";
 import type {
   HouseholdSettingsPatch,
@@ -177,23 +177,15 @@ export function patchHousehold(
     household = { ...household, coupleNights: patch.coupleNights };
   }
 
-  let meals = snapshot.meals;
-  let planning = snapshot.planning;
   if (patch.nightHeadcounts !== undefined) {
     household = withDerivedNightSettings(household, patch.nightHeadcounts);
     household = {
       ...household,
       nightsPlanned: nightsPlannedFromHeadcounts(household.nightHeadcounts),
     };
-    const resize = (meal: HouseholdSnapshot["meals"][number]) => {
-      const servings = headcountForNight(household, meal.nightDate);
-      return { ...meal, servings, audience: audienceFromHeadcount(servings) };
-    };
-    meals = snapshot.meals.map(resize);
-    if (planning) planning = { ...planning, meals: planning.meals.map(resize) };
   }
 
-  return { ...snapshot, household, meals, planning };
+  return { ...snapshot, household };
 }
 
 export function patchStoreAdded(

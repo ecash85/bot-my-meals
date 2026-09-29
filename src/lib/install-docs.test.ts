@@ -123,6 +123,29 @@ function expectPlanningPeopleGateInstallPaste(doc: string) {
   expect(doc).not.toMatch(/grandma/i);
 }
 
+function expectEditNightsInstallPaste(doc: string) {
+  expect(doc).toMatch(/week chrome has (?:\*\*)?Edit nights/);
+  expect(doc).toMatch(/week-scoped (?:\*\*)?People per night/);
+  expect(doc).toMatch(/empty (?:\*\*)?Next week(?:\*\*)? gate/);
+  expect(doc).toMatch(/re-open/);
+  expect(doc).toMatch(/does not rewrite House defaults/);
+  expect(doc).toMatch(/no (?:\*\*)?Edit nights(?:\*\*)? until (?:\*\*)?Unlock/);
+  expect(doc).toMatch(/Past weeks: no (?:\*\*)?Edit nights/);
+  expect(doc).toMatch(/planning-only/);
+  expect(doc).toMatch(/omit on cooking/);
+  expect(doc).toMatch(
+    /Used when you start a new week\. To change nights on This week or Next week, open that week and tap (?:\*\*)?Edit nights(?:\*\*)?\./,
+  );
+  expect(doc).toMatch(/template for new weeks/);
+  expect(doc).toMatch(/Saving House defaults does not resize\/rewrite/);
+  expect(doc).toMatch(/one cooking week/);
+  expect(doc).toMatch(/do not create a planning week/i);
+  expect(doc).toMatch(/night_headcounts/);
+  expect(doc).toMatch(/special_instructions/);
+  expect(doc).toMatch(/week_id/);
+  expect(doc).not.toMatch(/grandma/i);
+}
+
 function expectWebhookWaitingInstallPaste(doc: string) {
   expect(doc).toMatch(/configured/);
   expect(doc).toMatch(/does not teach checks every hour/);
@@ -160,6 +183,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectDualWeekProductLoop(readme);
     expectPlanningPeopleGateInstallPaste(paste);
     expectPlanningPeopleGateInstallPaste(readme);
+    expectEditNightsInstallPaste(paste);
+    expectEditNightsInstallPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
     expectWebhookWaitingInstallPaste(readme);
 
@@ -232,6 +257,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectDualWeekInstallPaste(paste);
     expectDualWeekProductLoop(readme);
     expectPlanningPeopleGateInstallPaste(paste);
+    expectEditNightsInstallPaste(paste);
+    expectEditNightsInstallPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
 
     const setupAt = paste.indexOf("After Create household, walk through house setup");
@@ -278,6 +305,8 @@ describe("Install docs — email + password + Wake on app event", () => {
 
     expectPlanningPeopleGateInstallPaste(paste);
     expectPlanningPeopleGateInstallPaste(readme);
+    expectEditNightsInstallPaste(paste);
+    expectEditNightsInstallPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
     expectWebhookWaitingInstallPaste(readme);
     expectWakeInstallPaste(paste);
@@ -285,6 +314,7 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectPasswordInstallHappyPath(paste);
 
     expect(readme).toContain("20260928233000_planning_people_gate.sql");
+    expect(readme).toContain("20260929001000_week_scoped_edit_nights.sql");
     expect(saved).toMatch(/People per night(?:\*\*)? first/);
     expect(saved).toMatch(/Special instructions/);
     expect(routines).toMatch(/does not teach checks every hour/);
@@ -292,6 +322,24 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/People per night(?:\*\*)? first/);
     expect(paste).not.toMatch(/the page says how often the Bot checks/);
     expect(readme).not.toMatch(/the page says how often the Bot checks/);
+  });
+
+  it("locks Edit nights on This week / Next week and House defaults as the new-week template", () => {
+    const readme = readRepo("README.md");
+    const paste = grokPromptPaste(readme);
+
+    expectEditNightsInstallPaste(paste);
+    expectEditNightsInstallPaste(readme);
+    expectPlanningPeopleGateInstallPaste(paste);
+    expectPlanningPeopleGateInstallPaste(readme);
+    expectDualWeekInstallPaste(paste);
+    expectDualWeekProductLoop(readme);
+    expectPasswordInstallHappyPath(paste);
+    expectWakeInstallPaste(paste);
+
+    expect(readme).toContain("20260929001000_week_scoped_edit_nights.sql");
+    expect(paste).toMatch(/do not create a planning week during setup/);
+    expect(readme).toMatch(/Install does not create a planning week/);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {

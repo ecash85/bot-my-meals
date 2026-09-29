@@ -23,6 +23,8 @@ export function PeoplePerNight({
   helper = "How many plates that night. Zero is an off night — no dinner planned.",
   compactOffNights = false,
   className,
+  note,
+  lockedWeekdays = [],
   children,
 }: {
   household: Household;
@@ -32,6 +34,10 @@ export function PeoplePerNight({
   helper?: string;
   compactOffNights?: boolean;
   className?: string;
+  /** Extra line under the helper. House uses this for new-week defaults. */
+  note?: string;
+  /** Weekdays that stay fixed after a mid-week unlock. */
+  lockedWeekdays?: readonly number[];
   children?: ReactNode;
 }) {
   const counts = normalizeNightHeadcounts(household.nightHeadcounts, household);
@@ -50,7 +56,10 @@ export function PeoplePerNight({
     });
   };
 
+  const locked = new Set(lockedWeekdays);
+
   const setNight = (weekday: number, value: number) => {
+    if (locked.has(weekday)) return;
     const next = [...counts];
     next[weekday] = clampNightHeadcount(value);
     persistNights(next);
@@ -66,6 +75,7 @@ export function PeoplePerNight({
       min={MIN_NIGHT_HEADCOUNT}
       max={MAX_HEADCOUNT}
       canEdit={canEdit}
+      frozen={locked.has(weekday)}
       onChange={(value) => setNight(weekday, value)}
     />
   );
@@ -74,6 +84,11 @@ export function PeoplePerNight({
     <HouseCard className={cn("mt-6", className)}>
       <h2 className="type-section text-primary">{title}</h2>
       <p className="type-meta mt-1 text-muted-foreground">{helper}</p>
+      {note ? (
+        <p data-slot="people-per-night-note" className="type-meta mt-2 text-muted-foreground">
+          {note}
+        </p>
+      ) : null}
       <ul data-slot="people-per-night" className="mt-4 space-y-2">
         {visibleNights.map((night) => renderStepper(night.label, night.weekday))}
       </ul>
@@ -90,6 +105,7 @@ function CountStepper({
   min,
   max,
   canEdit,
+  frozen = false,
   onChange,
 }: {
   day: number;
@@ -99,12 +115,15 @@ function CountStepper({
   min: number;
   max: number;
   canEdit: boolean;
+  frozen?: boolean;
   onChange: (value: number) => void;
 }) {
+  const editable = canEdit && !frozen;
   return (
     <li
       data-slot="night-stepper"
       data-day={day}
+      data-frozen={frozen ? "true" : "false"}
       className="flex min-h-12 items-center justify-between gap-3 rounded-[14px] bg-secondary px-3 py-2"
     >
       <div>
@@ -115,7 +134,7 @@ function CountStepper({
         <button
           type="button"
           aria-label={`Fewer people on ${label}`}
-          disabled={!canEdit || value <= min}
+          disabled={!editable || value <= min}
           onClick={() => onChange(value - 1)}
           className="tap-target flex size-12 items-center justify-center rounded-[var(--radius-button)] bg-card text-foreground shadow-card disabled:opacity-40"
         >
@@ -126,7 +145,7 @@ function CountStepper({
           inputMode="numeric"
           min={min}
           max={max}
-          disabled={!canEdit}
+          disabled={!editable}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
           aria-label={`People on ${label}`}
@@ -135,7 +154,7 @@ function CountStepper({
         <button
           type="button"
           aria-label={`More people on ${label}`}
-          disabled={!canEdit || value >= max}
+          disabled={!editable || value >= max}
           onClick={() => onChange(value + 1)}
           className="tap-target flex size-12 items-center justify-center rounded-[var(--radius-button)] bg-card text-foreground shadow-card disabled:opacity-40"
         >

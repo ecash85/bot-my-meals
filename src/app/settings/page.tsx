@@ -27,6 +27,7 @@ import {
   shouldShowHouseSetup,
   weeklyBudgetCurrencyPrefix,
 } from "@/lib/house-setup";
+import { HOUSE_PEOPLE_DEFAULTS_NOTE } from "@/lib/edit-nights";
 import { PAST_WEEKS_LABEL } from "@/lib/meal-history";
 import { SAVED_MEALS_LABEL, SAVED_MEALS_ROW_SUB } from "@/lib/saved-meals";
 import { isAdmin, roleLabel } from "@/lib/users";
@@ -160,6 +161,7 @@ function SettingsBody() {
       <PeoplePerNight
         household={snapshot.household}
         canEdit={owner}
+        note={HOUSE_PEOPLE_DEFAULTS_NOTE}
         onChange={(patch) => void updateHousehold(patch)}
       />
 

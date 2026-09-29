@@ -99,13 +99,15 @@ describe("optimistic snapshot patches", () => {
     expect(removed.votes[0]).toMatchObject({ choice: "remove", note: "" });
   });
 
-  it("updates plates and that night's servings together", () => {
+  it("updates house plate defaults without rewriting this week's meals", () => {
     const base = snapshot();
+    const servings = base.meals[0]?.servings;
     const next = patchHousehold(base, {
       nightHeadcounts: [3, 4, 4, 4, 4, 2, 2],
     });
     expect(next.household.nightHeadcounts[0]).toBe(3);
-    expect(next.meals[0]?.servings).toBe(3);
+    expect(next.meals[0]?.servings).toBe(servings);
+    expect(next.meals).toBe(base.meals);
     expect(next.household.nightsPlanned).toBe(7);
   });
 

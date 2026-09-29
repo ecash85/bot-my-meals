@@ -14,6 +14,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
 import { LockedNightFrame, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
 import { PastWeekDetail } from "@/components/past-weeks";
+import { EditNightsSheet } from "@/components/edit-nights-sheet";
 import { PlanningPeopleGate } from "@/components/planning-people-gate";
 import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { WeekChrome } from "@/components/week-chrome";
@@ -35,6 +36,11 @@ import {
 import { botCheckForHousehold } from "@/lib/bot-check";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
+import {
+  frozenWeekdays,
+  prefillWeekHeadcounts,
+  showEditNightsEntry,
+} from "@/lib/edit-nights";
 import {
   PLANNING_CREATE_ERROR,
   PLANNING_SWIPE_TOAST,
@@ -86,12 +92,14 @@ function WeekBody() {
 
 function WeekBallot() {
   const router = useRouter();
-  const { session, snapshot, setVote, requestWeekBallot, planNextWeek, savePlanningPeople } = useSupper();
+  const { session, snapshot, setVote, requestWeekBallot, planNextWeek, savePlanningPeople, saveWeekPeople } =
+    useSupper();
   const { role, scope, past, hasPlanning, stops, index, setViewedWeek } = useViewedWeek();
   const searchParams = useSearchParams();
   const [toast, setToast] = useState<string | undefined>();
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [editWeekId, setEditWeekId] = useState<string | null>(null);
   const creatingPlanning = useRef(false);
   const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
   const dismissToast = useCallback(() => setToast(undefined), []);
@@ -141,6 +149,8 @@ function WeekBallot() {
     },
     [planNextWeek, router, setViewedWeek],
   );
+
+  const editOpen = Boolean(scope && editWeekId === scope.week.id);
 
   const stepWeek = useCallback(
     (direction: -1 | 1) => {
@@ -285,6 +295,16 @@ function WeekBallot() {
                 }
               : null
           }
+          editNights={
+            showEditNightsEntry({
+              past: viewingPast,
+              locked: Boolean(locked),
+              canEdit: Boolean(session?.membershipId) && canActOnBallot(session?.role),
+              peopleGate: showPeopleGate,
+            })
+              ? { onEdit: () => setEditWeekId(scope?.week.id ?? null) }
+              : null
+          }
         />
       }
       status={undefined}
@@ -375,6 +395,35 @@ function WeekBallot() {
             {PAST_WEEKS_LABEL}
           </Link>
         </p>
+      ) : null}
+      {scope && !viewingPast ? (
+        <EditNightsSheet
+          key={scope.week.id}
+          open={editOpen}
+          role={role}
+          household={snapshot.household}
+          initialCounts={prefillWeekHeadcounts({
+            saved: scope.week.nightHeadcounts,
+            household: snapshot.household.nightHeadcounts,
+            meals: scope.meals,
+          })}
+          storedInstructions={scope.week.specialInstructions}
+          meals={scope.meals}
+          votes={scope.votes}
+          memberships={snapshot.memberships}
+          frozenWeekdays={frozenWeekdays({
+            startsOn: scope.week.startsOn,
+            status: scope.week.status,
+            editableFrom: scope.week.editableFrom,
+          })}
+          onOpenChange={(open) => {
+            if (!open) setEditWeekId(null);
+          }}
+          onSave={(counts, instructions) => saveWeekPeople(scope.week.id, counts, instructions)}
+          onSaved={(message) => {
+            if (message) setToast(message);
+          }}
+        />
       ) : null}
       <BallotToast message={toast} onDismiss={dismissToast} />
       <PostLockWaitingSheet

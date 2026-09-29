@@ -4,6 +4,7 @@ import { ChevronRight, ClipboardList, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { WeekNavigator } from "@/components/week-navigator";
 import { LOCK_SUCCESS_LIST_CTA, lockSuccessRecipesKicker } from "@/lib/lock-success";
+import { EDIT_NIGHTS_LABEL } from "@/lib/edit-nights";
 import { PLAN_NEXT_WEEK_LABEL } from "@/lib/open-weeks";
 import type { WeekStripNight } from "@/lib/week-strip";
 
@@ -25,6 +26,7 @@ export function WeekChrome({
   onSelect,
   onStep,
   planNext,
+  editNights = null,
 }: {
   startsOn: string;
   nights: readonly WeekStripNight[];
@@ -37,6 +39,7 @@ export function WeekChrome({
   onSelect: (mealId: string) => void;
   onStep: (direction: -1 | 1) => boolean;
   planNext: { busy: boolean; onPlan: () => void } | null;
+  editNights?: { onEdit: () => void } | null;
 }) {
   return (
     <WeekChromeView
@@ -51,6 +54,7 @@ export function WeekChrome({
       onSelect={onSelect}
       onStep={onStep}
       planNext={planNext}
+      editNights={editNights}
     />
   );
 }
@@ -67,6 +71,7 @@ export function WeekChromeView({
   onSelect,
   onStep,
   planNext,
+  editNights = null,
 }: {
   startsOn: string;
   nights: readonly WeekStripNight[];
@@ -79,6 +84,7 @@ export function WeekChromeView({
   onSelect: (mealId: string) => void;
   onStep: (direction: -1 | 1) => boolean;
   planNext: { busy: boolean; onPlan: () => void } | null;
+  editNights?: { onEdit: () => void } | null;
 }) {
   const showRows = showShoppingList || Boolean(firstMeal);
   return (
@@ -93,6 +99,18 @@ export function WeekChromeView({
         onSelect={onSelect}
         onStep={onStep}
       />
+      {editNights ? (
+        <div className="bg-card px-4">
+          <button
+            type="button"
+            data-slot="edit-nights"
+            className="inline-flex min-h-11 min-w-11 items-center text-base font-semibold text-primary"
+            onClick={editNights.onEdit}
+          >
+            {EDIT_NIGHTS_LABEL}
+          </button>
+        </div>
+      ) : null}
       {planNext ? (
         <p className="bg-card px-4 py-2 text-center">
           <button

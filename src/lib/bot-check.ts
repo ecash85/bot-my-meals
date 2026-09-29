@@ -413,16 +413,26 @@ export function botCheckForHousehold(
   return preferBotCheckStatus([cooking, planning]);
 }
 
+function savedWeekPlates(week?: { nightHeadcounts?: number[] | null }): number[] | null {
+  const saved = week?.nightHeadcounts;
+  if (Array.isArray(saved) && saved.length === 7) return normalizeNightHeadcounts(saved);
+  return null;
+}
+
 function mealFacts(
   household: BotCheckHousehold,
+  weekPlates: number[] | null,
   meals: BotCheckMeal[],
   votes: Vote[],
   memberships: Membership[],
 ): BotWorkMeal[] {
+  const source = weekPlates ? { ...household, nightHeadcounts: weekPlates } : null;
   return meals.map((meal) => ({
     lifecycle: nightLifecycle(meal, votes, memberships),
     servings: meal.servings,
-    expectedServings: headcountForNight(household, meal.nightDate),
+    expectedServings: source
+      ? headcountForNight(source, meal.nightDate)
+      : meal.servings,
   }));
 }
 
@@ -432,11 +442,12 @@ export function botCheckForSnapshot(snapshot: {
   votes: Vote[];
   memberships: Membership[];
   ballotRequest?: Pick<BallotRequest, "status" | "householdSize" | "nightHeadcounts"> | null;
-  week?: Pick<Week, "status">;
+  week?: Pick<Week, "status"> & { nightHeadcounts?: number[] | null };
   recipes?: Recipe[];
   shoppingList?: { items: readonly unknown[] } | null;
 }): BotCheckStatus {
   const household = snapshot.household;
+  const weekPlates = savedWeekPlates(snapshot.week);
   const ballot = snapshot.ballotRequest ?? null;
   const fillPending = snapshot.week
     ? isPendingBotFill({
@@ -456,8 +467,8 @@ export function botCheckForSnapshot(snapshot: {
     ballotHouseholdSize: ballot?.householdSize ?? null,
     ballotNightHeadcounts: ballot?.nightHeadcounts ?? null,
     householdSize: household.householdSize,
-    nightHeadcounts: household.nightHeadcounts,
-    meals: mealFacts(household, snapshot.meals, snapshot.votes, snapshot.memberships),
+    nightHeadcounts: weekPlates ?? ballot?.nightHeadcounts ?? household.nightHeadcounts,
+    meals: mealFacts(household, weekPlates, snapshot.meals, snapshot.votes, snapshot.memberships),
     fillPending,
   });
 }

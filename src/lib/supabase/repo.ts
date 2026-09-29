@@ -38,12 +38,7 @@ import type { JoinPeek } from "@/lib/join";
 import { parseJoinPeek } from "@/lib/join";
 import { canActOnBallot, lastWriterWinsToast, latestVoteForMeal, migrateVoteChoice } from "@/lib/lock";
 import { isAdmin } from "@/lib/users";
-import {
-  audienceFromHeadcount,
-  coupleNightsFromHeadcounts,
-  headcountForNight,
-  normalizeNightHeadcounts,
-} from "@/lib/headcount";
+import { coupleNightsFromHeadcounts, normalizeNightHeadcounts } from "@/lib/headcount";
 import { parseMealHistory, todayInTimeZone } from "@/lib/meal-history";
 import { splitOpenWeeks } from "@/lib/open-weeks";
 import { parseSavedMeals } from "@/lib/saved-meals";
@@ -622,45 +617,6 @@ export async function supabaseUpdateHousehold(
     })
     .eq("id", session.householdId);
   if (error) throw new Error(error.message);
-
-  if (!nightHeadcounts && !patch.coupleNights) return;
-
-  const { data: householdRow, error: householdError } = await client
-    .from("households")
-    .select("*")
-    .eq("id", session.householdId)
-    .single();
-  if (householdError || !householdRow) return;
-
-  const household = {
-    nightHeadcounts: normalizeNightHeadcounts(householdRow.night_headcounts, {
-      coupleNights: householdRow.couple_nights,
-      familySize: householdRow.family_size,
-      coupleSize: householdRow.couple_size,
-    }),
-    coupleNights: householdRow.couple_nights as number[],
-    familySize: householdRow.family_size as number,
-    coupleSize: householdRow.couple_size as number,
-  };
-
-  const { data: meals, error: mealsError } = await client
-    .from("meals")
-    .select("id, night_date")
-    .eq("household_id", session.householdId);
-  if (mealsError || !meals?.length) return;
-
-  await Promise.all(
-    meals.map((meal) => {
-      const servings = headcountForNight(household, meal.night_date);
-      return client
-        .from("meals")
-        .update({
-          servings,
-          audience: audienceFromHeadcount(servings),
-        })
-        .eq("id", meal.id);
-    }),
-  );
 }
 
 export async function supabaseJoinByCode(client: SupabaseClient, code: string) {
@@ -789,6 +745,22 @@ export async function supabaseSavePlanningPeople(
   });
   if (error) throw new Error(error.message);
   if (typeof data !== "string" || !data) throw new Error("Could not save people per night.");
+  return data;
+}
+
+export async function supabaseSaveWeekPeople(
+  client: SupabaseClient,
+  weekId: string,
+  counts: number[],
+  instructions: string | null,
+) {
+  const { data, error } = await client.rpc("save_week_people", {
+    target_week: weekId,
+    counts: normalizeNightHeadcounts(counts),
+    instructions,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !data) throw new Error("Couldn’t save nights. Try again.");
   return data;
 }
 

@@ -55,6 +55,7 @@ import {
   supabaseRequestSavedMeal,
   supabaseRequestWeekBallot,
   supabaseSaveMeal,
+  supabaseSaveWeekPeople,
   supabaseSavePlanningPeople,
   supabaseSetMemberRole,
   supabaseSetVote,
@@ -133,6 +134,7 @@ type SupperContextValue = {
   requestWeekBallot: (startsOn?: string) => Promise<string>;
   planNextWeek: () => Promise<string>;
   savePlanningPeople: (counts: number[], instructions: string) => Promise<string>;
+  saveWeekPeople: (weekId: string, counts: number[], instructions: string | null) => Promise<void>;
   toggleSavedMeal: (mealId: string) => Promise<"saved" | "removed">;
   removeSavedMeal: (recipeKey: string) => Promise<void>;
   requestSavedMeal: (recipeKey: string) => Promise<"requested" | "already">;
@@ -191,6 +193,7 @@ function createSetupContext(): SupperContextValue {
     requestWeekBallot: async () => setupUnavailable(),
     planNextWeek: async () => setupUnavailable(),
     savePlanningPeople: async () => setupUnavailable(),
+    saveWeekPeople: async () => setupUnavailable(),
     toggleSavedMeal: async () => setupUnavailable(),
     removeSavedMeal: async () => setupUnavailable(),
     requestSavedMeal: async () => setupUnavailable(),
@@ -756,6 +759,12 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
             return supabaseSavePlanningPeople(client, counts, instructions);
           },
         ),
+      saveWeekPeople: (weekId, counts, instructions) =>
+        run(async () => {
+          const client = createSupabaseBrowserClient();
+          if (!client) throw new Error("Not signed in");
+          await supabaseSaveWeekPeople(client, weekId, counts, instructions);
+        }),
       toggleSavedMeal: (mealId) => {
         const current = session;
         const visible = displayRef.current;
