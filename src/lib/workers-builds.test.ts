@@ -55,7 +55,15 @@ describe("Workers Builds deploy docs", () => {
     const rootPkg = JSON.parse(readRepo("package.json"));
 
     expect(appWrangler.name).toBe("bot-my-meals");
+    expect(appWrangler.keep_vars).toBe(true);
+    expect(appWrangler.env).toBeUndefined();
+    expect(docs).toMatch(/keep_vars/);
     expect(docs).toMatch(/leave blank \(repo root\)/);
+
+    const deploy = readRepo("scripts/cf-deploy.mjs");
+    expect(deploy).not.toMatch(/--keep-vars/);
+    expect(deploy).not.toMatch(/--var\b/);
+    expect(readRepo("package.json")).toMatch(/"deploy:preview": "wrangler versions upload"/);
     expect(rootPkg.scripts["build:worker"]).toMatch(/opennextjs-cloudflare build/);
     expect(rootPkg.scripts["deploy:marketing"]).toBeUndefined();
     expect(rootPkg.name).toBe("bot-my-meals");

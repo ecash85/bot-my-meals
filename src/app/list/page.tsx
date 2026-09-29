@@ -23,6 +23,7 @@ import {
   LIST_NO_HOUSEHOLD,
   LIST_NOTHING_TO_BUY,
   LIST_PRE_LOCK_DESCRIPTION,
+  LIST_STORE_EMPTY,
   LOCK_FIRST_TITLE,
 } from "@/lib/lock-success";
 import { isPendingBotFill } from "@/lib/post-lock-waiting";
@@ -142,21 +143,27 @@ function ListBody() {
             >
               {group.label}
             </h2>
-            <ul className="divide-y divide-border">
-              {group.items.map((item) => {
-                const display = listItemDisplay(item);
-                return (
-                  <ShoppingListRow
-                    key={item.id}
-                    itemId={item.id}
-                    name={display.name}
-                    quantity={display.quantity}
-                    checked={item.checked}
-                    onToggle={toggleItem}
-                  />
-                );
-              })}
-            </ul>
+            {group.items.length === 0 ? (
+              <p data-slot="list-store-empty" className="type-body px-1 py-3 text-muted-foreground">
+                {LIST_STORE_EMPTY}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {group.items.map((item) => {
+                  const display = listItemDisplay(item);
+                  return (
+                    <ShoppingListRow
+                      key={item.id}
+                      itemId={item.id}
+                      name={display.name}
+                      quantity={display.quantity}
+                      checked={item.checked}
+                      onToggle={toggleItem}
+                    />
+                  );
+                })}
+              </ul>
+            )}
           </section>
         ))}
       </div>

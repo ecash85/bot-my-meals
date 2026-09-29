@@ -67,11 +67,15 @@ export function buildShoppingItems(input: {
   }));
 }
 
-/** Locked-list sticky headers — Trader Joe’s / Smith’s only. Never a cart. */
+/** Sticky section titles. Trader Joe's and Smith's keep catalog labels; every other store uses its name. Never a cart. */
 export const STORE_LABEL_TRADER_JOES = "Trader Joe's";
 export const STORE_LABEL_SMITHS = "Smith's";
+export const STORE_LABEL_OTHER = "Other";
 
-export function listStoreLabel(store: Pick<Store, "slug">): string | null {
+/** Stable id for items whose store_id is not a household store. Not a household_stores row. */
+export const OTHER_STORE_SECTION_ID = "__other__";
+
+export function listStoreLabel(store: Pick<Store, "slug" | "name">): string {
   switch (store.slug) {
     case "trader-joes":
     case "trader-joe-s":
@@ -79,35 +83,58 @@ export function listStoreLabel(store: Pick<Store, "slug">): string | null {
     case "smiths":
     case "smith-s":
       return STORE_LABEL_SMITHS;
-    default:
-      return null;
+    default: {
+      const name = store.name.trim();
+      return name || store.slug;
+    }
   }
 }
 
+/** Every household store, in sort order, including stores with nothing to buy. */
 export function groupItemsByStore(
   items: ShoppingItem[],
   stores: Store[],
 ): Array<{ store: Store; items: ShoppingItem[] }> {
   const sortedStores = [...stores].sort((a, b) => a.sortOrder - b.sortOrder);
-  return sortedStores
-    .map((store) => ({
-      store,
-      items: items
-        .filter((item) => item.storeId === store.id)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    }))
-    .filter((group) => group.items.length > 0);
+  return sortedStores.map((store) => ({
+    store,
+    items: items
+      .filter((item) => item.storeId === store.id)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
 }
 
-/** Post-lock sticky sections. Catalog slugs, plus apostrophe slugs saved before the picker passed a slug. */
+/** Post-lock sticky sections. One section per household store, then Other for unmatched store ids. */
 export function groupStickyStoreLists(
   items: ShoppingItem[],
   stores: Store[],
 ): Array<{ store: Store; label: string; items: ShoppingItem[] }> {
-  return groupItemsByStore(items, stores).flatMap((group) => {
-    const label = listStoreLabel(group.store);
-    return label ? [{ ...group, label }] : [];
-  });
+  const known = new Set(stores.map((store) => store.id));
+  const groups = groupItemsByStore(items, stores).map((group) => ({
+    ...group,
+    label: listStoreLabel(group.store),
+  }));
+
+  const otherItems = items
+    .filter((item) => !known.has(item.storeId))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (otherItems.length === 0) return groups;
+
+  const householdId = stores[0]?.householdId ?? otherItems[0]?.householdId ?? "";
+  return [
+    ...groups,
+    {
+      store: {
+        id: OTHER_STORE_SECTION_ID,
+        householdId,
+        name: STORE_LABEL_OTHER,
+        slug: "other",
+        sortOrder: Number.MAX_SAFE_INTEGER,
+      },
+      label: STORE_LABEL_OTHER,
+      items: otherItems,
+    },
+  ];
 }
 
 export function formatQuantity(quantity: number, unit: string): string {

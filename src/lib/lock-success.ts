@@ -21,6 +21,8 @@ export const LIST_NO_HOUSEHOLD = "Join a household to see a list after the week 
 export const RECIPES_NO_HOUSEHOLD = "Join a household to see recipes after the week locks.";
 export const LIST_NOTHING_TO_BUY =
   "Every remaining night is leftovers or was removed. No prices were invented.";
+/** A household store section that has no lines on this list. */
+export const LIST_STORE_EMPTY = "Nothing here";
 export const RECIPES_EMPTY_WEEK =
   "Ask your Bot My Meals to propose dinners on This week. Lock the week, then recipes will show here.";
 export const RECIPES_EMPTY_NEXT_WEEK =
