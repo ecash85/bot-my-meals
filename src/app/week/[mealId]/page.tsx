@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
+import { mealCookPlan } from "@/lib/cook-timing";
 import { formatNightDate, weekdayLabelFromNight } from "@/lib/dates";
+import { formatDurationSentence } from "@/lib/duration";
 import { servingsLabel } from "@/lib/headcount";
 import { REPLACEMENT_IDEAS } from "@/lib/ideas";
 import { canActOnBallot, isNightOff, latestVoteForMeal, voteFor, votingMembers } from "@/lib/lock";
@@ -78,6 +80,12 @@ function MealDetail({ mealId }: { mealId: string }) {
   const weekday = weekdayLabelFromNight(meal.nightDate);
   const skipped = isNightOff(meal.id, scope.votes, snapshot.memberships);
   const recipe = scope.recipes.find((item) => item.mealId === meal.id);
+  const cookPlan = mealCookPlan({
+    meal,
+    recipe,
+    timeZone: snapshot.household.timezone,
+    dinnerTime: snapshot.household.dinnerTime,
+  });
   const pendingRecipe = nightShowsRecipePending({
     weekStatus: scope.week.status,
     meals: scope.meals,
@@ -147,7 +155,15 @@ function MealDetail({ mealId }: { mealId: string }) {
           <>
             {saveControl}
             <div className="mt-4">
-              <RecipeBlock recipe={recipe} servings={meal.servings} />
+              <RecipeBlock
+                recipe={recipe}
+                servings={meal.servings}
+                cook={{
+                  meal,
+                  timeZone: snapshot.household.timezone,
+                  dinnerTime: snapshot.household.dinnerTime,
+                }}
+              />
             </div>
           </>
         )
@@ -157,7 +173,11 @@ function MealDetail({ mealId }: { mealId: string }) {
             <p className="type-body text-muted-foreground">{meal.pitch}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge variant="secondary">{servingsLabel(meal.servings)}</Badge>
-              <Badge variant="outline">About {meal.prepMinutes} minutes</Badge>
+              {meal.prepMinutes > 0 ? (
+                <Badge variant="outline">About {formatDurationSentence(meal.prepMinutes)}</Badge>
+              ) : null}
+              {cookPlan.startByLabel ? <Badge variant="outline">{cookPlan.startByLabel}</Badge> : null}
+              {cookPlan.aheadLine ? <Badge variant="outline">{cookPlan.aheadLine}</Badge> : null}
               {meal.isLeftovers ? <Badge variant="outline">Leftovers</Badge> : null}
             </div>
           </div>

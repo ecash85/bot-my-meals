@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AheadPrepNotice } from "@/components/ahead-prep";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
 import { BallotCard } from "@/components/ballot-card";
@@ -38,6 +39,7 @@ import {
 } from "@/lib/ballot";
 import { botCheckForHousehold, botCheckForSnapshot } from "@/lib/bot-check";
 import { FINISH_WAKE_BEFORE_CREATE } from "@/lib/bot-wake";
+import { mealCookPlan } from "@/lib/cook-timing";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import {
@@ -60,7 +62,7 @@ import {
 } from "@/lib/week-navigator";
 import { isPendingBotFill, lockedDinnerTap, POST_LOCK_GET_RECIPES_NEXT_HINT, POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT } from "@/lib/post-lock-waiting";
 import { focusNightCard, nightCardAnchorId } from "@/lib/week-strip";
-import { canActOnBallot, checkWeekLock, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
+import { canActOnBallot, checkWeekLock, isNightOff, latestVoteForMeal, nightLifecycle } from "@/lib/lock";
 import { recipeNightsForWeek } from "@/lib/recipes";
 import {
   nightHasStripMeal,
@@ -203,6 +205,26 @@ function WeekBallot() {
   const botCheck = botCheckForHousehold(snapshot);
   const check = scope ? checkWeekLock(scope.meals, scope.votes, snapshot.memberships) : { ready: false };
   const nights = scope ? recipeNightsForWeek(scope.meals) : [];
+  const removedMealIds = new Set(
+    nights
+      .filter((meal) => isNightOff(meal.id, scope?.votes ?? [], snapshot.memberships))
+      .map((meal) => meal.id),
+  );
+  const nightDates = new Set(nights.map((meal) => meal.nightDate));
+  const cookPlans = nights.map((meal) => ({
+    meal,
+    plan: mealCookPlan({
+      meal,
+      recipe: scope?.recipes.find((item) => item.mealId === meal.id),
+      timeZone: snapshot.household.timezone,
+      dinnerTime: snapshot.household.dinnerTime,
+    }),
+  }));
+  const prepNotices = cookPlans.flatMap(({ meal, plan }) =>
+    removedMealIds.has(meal.id) ? [] : plan.notices,
+  );
+  const leadingPrep = prepNotices.filter((notice) => !nightDates.has(notice.showOn));
+  const planFor = (mealId: string) => cookPlans.find((item) => item.meal.id === mealId)?.plan;
   const dinner = scope ? upcomingDinner(scope.meals, scope.votes, todayIso) : undefined;
   const firstMeal =
     scope && showFirstMealRow({ weekStatus: scope.week.status, pendingFill, meal: dinner }) && dinner
@@ -383,9 +405,13 @@ function WeekBallot() {
               checkNowWakeHint={role === "planning" ? POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT : undefined}
             />
           ) : null}
+          {leadingPrep.map((notice) => (
+            <AheadPrepNotice key={`${notice.showOn}-${notice.mealId}`} text={notice.text} />
+          ))}
           {nights.map((meal) => {
             const dayLabel = formatMealCardDayLabel(meal.nightDate);
             const dayName = weekdayLabelFromNight(meal.nightDate);
+            const dayPrep = prepNotices.filter((notice) => notice.showOn === meal.nightDate);
             const latest = latestVoteForMeal(scope?.votes ?? [], meal.id, snapshot.memberships);
             const lifecycle = nightLifecycle(meal, scope?.votes ?? [], snapshot.memberships);
             const nightLocked = nightStaysLocked({
@@ -404,8 +430,11 @@ function WeekBallot() {
                 id={nightCardAnchorId(meal.id)}
                 tabIndex={-1}
                 data-slot="night-card-anchor"
-                className="scroll-mt-[calc(var(--shell-head-h)+0.25rem)] rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
+                className="scroll-mt-[calc(var(--shell-head-h)+0.25rem)] space-y-2 rounded-[14px] outline-none focus:ring-2 focus:ring-primary/40"
               >
+                {dayPrep.map((notice) => (
+                  <AheadPrepNotice key={`${notice.showOn}-${notice.mealId}`} text={notice.text} />
+                ))}
                 {renderNightCard({
                   presentation,
                   dayLabel,
@@ -417,6 +446,8 @@ function WeekBallot() {
                   locked: nightLocked,
                   pending: pendingFill,
                   lifecycle,
+                  startBy: planFor(meal.id)?.startByLabel,
+                  aheadLine: planFor(meal.id)?.aheadLine,
                   onAct: act,
                   onWaiting: () => setWaitingOpen(true),
                 })}
@@ -488,6 +519,8 @@ function renderNightCard({
   locked,
   pending,
   lifecycle,
+  startBy,
+  aheadLine,
   onAct,
   onWaiting,
 }: {
@@ -501,6 +534,8 @@ function renderNightCard({
   locked: boolean;
   pending: boolean;
   lifecycle: NightLifecycle;
+  startBy?: string | null;
+  aheadLine?: string | null;
   onAct: (mealId: string, choice: VoteChoice, note?: string) => void;
   onWaiting: () => void;
 }): ReactNode {
@@ -551,6 +586,8 @@ function renderNightCard({
               isNightOff: false,
             })}
             locked={locked}
+            startBy={startBy}
+            aheadLine={aheadLine}
             onSwap={canVote ? (reason) => onAct(meal.id, "swap", reason) : undefined}
             onRemove={canVote ? () => onAct(meal.id, "remove") : undefined}
           />

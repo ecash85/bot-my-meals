@@ -48,6 +48,8 @@ export function BallotCard({
   swapNote,
   muted = false,
   locked = false,
+  startBy,
+  aheadLine,
   onSwap,
   onRemove,
   className,
@@ -61,6 +63,8 @@ export function BallotCard({
   swapNote?: string;
   muted?: boolean;
   locked?: boolean;
+  startBy?: string | null;
+  aheadLine?: string | null;
   onSwap?: (reason: string) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
   className?: string;
@@ -113,6 +117,16 @@ export function BallotCard({
           )}
         >
           {pitch}
+        </p>
+      ) : null}
+      {startBy ? (
+        <p data-slot="start-by" className="type-body mt-2 font-semibold text-foreground">
+          {startBy}
+        </p>
+      ) : null}
+      {aheadLine ? (
+        <p data-slot="ahead-line" className="type-meta mt-1 text-muted-foreground">
+          {aheadLine}
         </p>
       ) : null}
       {servings != null && servings > 0 ? (

@@ -262,7 +262,8 @@ describe("post-lock waiting copy", () => {
     expect(recipes).toContain("weekHomeTitle(role)");
     expect(recipes).not.toContain("Back to This week");
     expect(recipes).not.toContain('backLabel="This week"');
-    expect(meal).toContain("<RecipeBlock recipe={recipe} servings={meal.servings} />");
+    expect(meal).toContain("<RecipeBlock");
+    expect(meal).toContain("servings={meal.servings}");
     expect(meal).not.toContain("No recipe was saved for this night");
     expect(list).toContain("pendingFill && (!list || list.items.length === 0)");
     expect(list).toContain("LIST_NOTHING_TO_BUY");

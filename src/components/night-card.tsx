@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDuration } from "@/lib/duration";
 import { WEEKDAY_LABELS } from "@/lib/dates";
 import { formatNightDate } from "@/lib/dates";
 import { servingsLabel } from "@/lib/headcount";
@@ -42,7 +43,7 @@ export function NightCard({
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{servingsLabel(meal.servings)}</Badge>
-        <Badge variant="outline">{meal.prepMinutes} min</Badge>
+        <Badge variant="outline">{formatDuration(meal.prepMinutes)}</Badge>
         {meal.isLeftovers ? <Badge variant="outline">Leftovers</Badge> : null}
         {mine ? (
           <Badge>{voteConfirmation(mine.choice)}</Badge>
