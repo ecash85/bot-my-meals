@@ -205,6 +205,27 @@ function expectWebhookWaitingInstallPaste(doc: string) {
   expect(doc).not.toMatch(/grandma/i);
 }
 
+function expectKeepingUpWithTim(doc: string) {
+  expect(doc).toMatch(/Keeping up with Tim/);
+  expect(doc).toMatch(
+    /[Kk]eep up to date with the GitHub repo \[https:\/\/github\.com\/timdoes\/bot-my-meals\]\(https:\/\/github\.com\/timdoes\/bot-my-meals\)/,
+  );
+  expect(doc).toMatch(/not the Worker hostname/);
+  expect(doc).toMatch(/not the marketing site botmymeals\.com/);
+  expect(doc).toMatch(/[Pp]ull Tim(?:'|’)s updates/);
+  expect(doc).toMatch(/that public repo/);
+  expect(doc).toMatch(
+    /git remote add upstream https:\/\/github\.com\/timdoes\/bot-my-meals\.git/,
+  );
+  expect(doc).toMatch(/upstream\/main/);
+  expect(doc).toMatch(/Sync fork/);
+  expect(doc).toMatch(/rebuilds and redeploys/);
+  expect(doc).toMatch(/not \{handle\}\.botmymeals\.com/);
+  expect(doc).toMatch(/service-role/);
+  expect(doc).toMatch(/NEXT_PUBLIC_SUPABASE_URL|public Supabase URL/);
+  expect(doc).not.toMatch(/grandma/i);
+}
+
 describe("Install docs — email + password + Wake on app event", () => {
   it("locks Auth, domains, and the #grok-prompt paste on password sign-in and Cos webhook wake", () => {
     const readme = readRepo("README.md");
@@ -227,6 +248,20 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
     expectWebhookWaitingInstallPaste(readme);
+    expectKeepingUpWithTim(readme);
+    expect(paste).toMatch(/Keeping up with Tim/);
+    expect(paste).toMatch(
+      /keep up to date with the GitHub repo https:\/\/github\.com\/timdoes\/bot-my-meals/,
+    );
+    expect(paste).toMatch(/not the Worker hostname, not botmymeals\.com/);
+    expect(paste).toMatch(/pull Tim(?:'|’)s updates from that public repo/);
+    expect(paste).toMatch(
+      /git remote upstream https:\/\/github\.com\/timdoes\/bot-my-meals\.git/,
+    );
+    expect(paste).toMatch(/Workers Builds then rebuilds and redeploys/);
+    expect(paste).toMatch(/Sync fork/);
+    expect(paste).toMatch(/not \{handle\}\.botmymeals\.com/);
+    expect(paste).toMatch(/Never put service-role in git/);
 
     expect(paste).toMatch(/Confirm email OFF/);
     expect(paste).toMatch(/email \+ password/);
