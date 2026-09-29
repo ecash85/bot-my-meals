@@ -14,7 +14,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
 import { EditNightsControl } from "@/components/edit-nights-control";
 import { LockedNightFrame, MealsWaitingCard, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
-import { requestPendingRefresh } from "@/components/use-bot-wake";
+import { requestPendingRefresh, useBotWakeConfigured } from "@/components/use-bot-wake";
 import { PastWeekDetail } from "@/components/past-weeks";
 import { EditNightsSheet } from "@/components/edit-nights-sheet";
 import { PlanningPeopleGate } from "@/components/planning-people-gate";
@@ -37,6 +37,7 @@ import {
   type WeekNightPresentation,
 } from "@/lib/ballot";
 import { botCheckForHousehold, botCheckForSnapshot } from "@/lib/bot-check";
+import { FINISH_WAKE_BEFORE_CREATE } from "@/lib/bot-wake";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import {
@@ -271,8 +272,6 @@ function WeekBallot() {
     !viewingPast && !showPeopleGate && Boolean(viewedWork?.needs_work) && !pendingFill;
   const waitingCard = (
     <MealsWaitingCard
-      mode={snapshot.household.botCheckMode}
-      intervalHours={snapshot.household.botCheckIntervalHours}
       weekRole={role}
       startsOn={scope?.week.startsOn ?? snapshot.week.startsOn}
       bothOpen={hasPlanning}
@@ -369,8 +368,6 @@ function WeekBallot() {
           {pendingFill ? (
             <div data-slot="week-pending-fill" data-state="pending" className="mb-4">
               <PostLockWaitingCard
-                mode={snapshot.household.botCheckMode}
-                intervalHours={snapshot.household.botCheckIntervalHours}
                 weekRole={role}
                 startsOn={scope?.week.startsOn ?? snapshot.week.startsOn}
                 bothOpen={hasPlanning}
@@ -472,8 +469,6 @@ function WeekBallot() {
       <PostLockWaitingSheet
         open={waitingOpen}
         onOpenChange={setWaitingOpen}
-        mode={snapshot.household.botCheckMode}
-        intervalHours={snapshot.household.botCheckIntervalHours}
         weekRole={role}
         startsOn={scope?.week.startsOn ?? past?.startsOn ?? snapshot.week.startsOn}
         bothOpen={hasPlanning}
@@ -572,8 +567,10 @@ function emptyWeekCta(
   action: EmptyWeekAction,
   cta: string,
   creating: boolean,
+  wakeConfigured: boolean | null,
   onCreate: () => Promise<void>,
 ) {
+  const wakeReady = wakeConfigured === true;
   switch (action) {
     case "finish-setup":
       return (
@@ -583,19 +580,29 @@ function emptyWeekCta(
       );
     case "create-meals":
       return (
-        <Button
-          type="button"
-          size="fat"
-          variant="primary"
-          className="mt-4 w-full"
-          disabled={creating}
-          aria-label={creating ? "Saving" : cta}
-          aria-busy={creating}
-          onClick={() => void onCreate()}
-        >
-          {creating ? <Loader2 className="size-5 animate-spin" aria-hidden /> : null}
-          {creating ? "Saving…" : cta}
-        </Button>
+        <>
+          <Button
+            type="button"
+            size="fat"
+            variant="primary"
+            className="mt-4 w-full"
+            disabled={creating || !wakeReady}
+            aria-label={creating ? "Saving" : cta}
+            aria-busy={creating}
+            onClick={() => void onCreate()}
+          >
+            {creating ? <Loader2 className="size-5 animate-spin" aria-hidden /> : null}
+            {creating ? "Saving…" : cta}
+          </Button>
+          {wakeConfigured === false ? (
+            <p data-slot="finish-wake-first" className="type-meta mt-3 text-muted-foreground">
+              {FINISH_WAKE_BEFORE_CREATE}{" "}
+              <Link href="/settings#wake-your-bot" className="font-semibold text-primary">
+                Wake your Bot
+              </Link>
+            </p>
+          ) : null}
+        </>
       );
     case "waiting":
       return (
@@ -613,6 +620,7 @@ function emptyWeekCta(
 function EmptyWeek({ onCreateMeals }: { onCreateMeals: () => Promise<string> }) {
   const { session, snapshot } = useSupper();
   const { scope, role } = useViewedWeek();
+  const wakeConfigured = useBotWakeConfigured();
   const [creating, setCreating] = useState(false);
   const setupIncomplete = !isHouseSetupComplete(snapshot?.household.setupStep ?? 8);
   const botCheck = snapshot ? botCheckForHousehold(snapshot) : null;
@@ -629,7 +637,7 @@ function EmptyWeek({ onCreateMeals }: { onCreateMeals: () => Promise<string> }) 
     >
       <h2 className="type-section">{copy.title}</h2>
       <p className="type-body mt-2 text-muted-foreground">{copy.helper}</p>
-      {emptyWeekCta(copy.action, copy.cta, creating, async () => {
+      {emptyWeekCta(copy.action, copy.cta, creating, wakeConfigured, async () => {
         setCreating(true);
         try {
           await onCreateMeals();

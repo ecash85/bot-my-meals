@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { UnlockWeekControl } from "@/components/unlock-week-control";
 import { ChevronRight } from "lucide-react";
 import { AppearancePicker } from "@/components/appearance-picker";
-import { BotCheckFrequency } from "@/components/bot-check-frequency";
 import { BotWakeSettings } from "@/components/bot-wake-settings";
 import { AppShell } from "@/components/app-shell";
 import { AuthGate } from "@/components/auth-gate";
@@ -225,13 +224,6 @@ function SettingsBody() {
       </HouseCard>
 
       <BotWakeSettings canEdit={owner} />
-
-      <BotCheckFrequency
-        mode={snapshot.household.botCheckMode}
-        intervalHours={snapshot.household.botCheckIntervalHours}
-        canEdit={owner}
-        onChange={(patch) => updateHousehold(patch)}
-      />
 
       {owner && scope?.week.status === "locked" ? (
         <section className="mt-6">

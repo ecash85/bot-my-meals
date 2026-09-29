@@ -48,6 +48,8 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).toMatch(/stay quiet if nothing changed/);
   expect(paste).toMatch(/Never NEXT_PUBLIC/);
   expect(paste).toMatch(/do not show the full secret again/i);
+  expect(paste).toMatch(/required before Create this week's meals/);
+  expect(paste).toMatch(/There is no Skip/);
   expect(paste).toMatch(/fallback/);
   expect(paste).toMatch(/do not create Adaptive/i);
   expect(paste).toMatch(/Required for every household/);
@@ -348,7 +350,10 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/Never `NEXT_PUBLIC_`/);
     expect(routines).toMatch(/Saved · Replace/);
     expect(routines).toMatch(/stay quiet if nothing changed/);
-    expect(routines).toMatch(/fallback/);
+    expect(routines).toMatch(/Waiting never shows a schedule/);
+    expect(routines).toMatch(/required before Create this week's meals/);
+    expect(routines).not.toMatch(/@every/);
+    expect(routines).not.toMatch(/Bot check frequency/);
     expect(routines).not.toMatch(/Copy \*\*POST to\*\* \(the webhook URL\) and \*\*key\*\*/);
     expect(routines).not.toMatch(/grandma/i);
     expect(routines).toMatch(/any open week/);
@@ -411,9 +416,10 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(routines).toMatch(/not a chip row/);
     expect(routines).toMatch(/People per night(?:\*\*)? first/);
     expect(routines).toMatch(/Special instructions/);
-    expect(routines).toMatch(/does not teach checks every hour/);
+    expect(routines).toMatch(/Waiting never shows a schedule/);
     expect(routines).toMatch(/Your bot was notified/);
-    expect(routines).toMatch(/silent backend fallback/);
+    expect(routines).not.toMatch(/silent backend fallback/);
+    expect(routines).not.toMatch(/@every/);
     expect(routines).toMatch(/Next week started\. Set people per night/);
     expect(routines).not.toMatch(/While waiting, the page says how often the Bot checks/);
     expect(routines).not.toMatch(/the future edge soft-stops or offers Plan next week/);
@@ -441,8 +447,9 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(readme).toContain("20260929001000_week_scoped_edit_nights.sql");
     expect(saved).toMatch(/People per night(?:\*\*)? first/);
     expect(saved).toMatch(/Special instructions/);
-    expect(routines).toMatch(/does not teach checks every hour/);
-    expect(routines).toMatch(/silent backend fallback/);
+    expect(routines).toMatch(/Waiting never shows a schedule/);
+    expect(routines).not.toMatch(/silent backend fallback/);
+    expect(routines).not.toMatch(/@every/);
     expect(routines).toMatch(/People per night(?:\*\*)? first/);
     expect(paste).not.toMatch(/the page says how often the Bot checks/);
     expect(readme).not.toMatch(/the page says how often the Bot checks/);

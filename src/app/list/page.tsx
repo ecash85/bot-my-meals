@@ -105,12 +105,7 @@ function ListBody() {
   if (pendingFill && (!list || list.items.length === 0)) {
     return (
       <AppShell title={listTitle} eyebrow={formatWeekEyebrow(scope.week.startsOn, true)} backHref="/week" backLabel={backLabel}>
-        <PostLockWaitingCard
-          mode={snapshot.household.botCheckMode}
-          weekRole={role}
-          startsOn={scope.week.startsOn}
-          intervalHours={snapshot.household.botCheckIntervalHours}
-        />
+        <PostLockWaitingCard weekRole={role} startsOn={scope.week.startsOn} />
       </AppShell>
     );
   }

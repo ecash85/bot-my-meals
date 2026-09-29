@@ -108,12 +108,7 @@ function RecipesBody() {
         backHref="/week"
         backLabel={backLabel}
       >
-        <PostLockWaitingCard
-          mode={snapshot.household.botCheckMode}
-          intervalHours={snapshot.household.botCheckIntervalHours}
-          weekRole={role}
-          startsOn={scope.week.startsOn}
-        />
+        <PostLockWaitingCard weekRole={role} startsOn={scope.week.startsOn} />
       </AppShell>
     );
   }

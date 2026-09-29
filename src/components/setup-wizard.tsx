@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2, Minus, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { BotWakeSettings } from "@/components/bot-wake-settings";
+import { useBotWakeConfigured } from "@/components/use-bot-wake";
 import { HouseCard } from "@/components/house-card";
 import { HouseStores } from "@/components/house-stores";
 import { InviteShare } from "@/components/invite-share";
@@ -31,6 +33,7 @@ import {
   parseWeeklyBudgetDollars,
   previousHouseSetupStep,
 } from "@/lib/house-setup";
+import { FINISH_WAKE_BEFORE_CREATE } from "@/lib/bot-wake";
 import { SETUP_HELPER, SETUP_TITLE } from "@/lib/setup";
 import { isAdmin } from "@/lib/users";
 
@@ -52,6 +55,8 @@ export function SetupWizard() {
   const [nightsOnDraft, setNightsOnDraft] = useState<boolean[] | null>(null);
   const [askCopied, setAskCopied] = useState(false);
   const triedJoinToken = useRef(false);
+  const wakeConfigured = useBotWakeConfigured();
+  const createReady = wakeConfigured === true;
 
   const household = snapshot?.household;
   const step = household?.setupStep ?? 1;
@@ -131,6 +136,10 @@ export function SetupWizard() {
   };
 
   const createMeals = async () => {
+    if (wakeConfigured !== true) {
+      setError(FINISH_WAKE_BEFORE_CREATE);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -170,13 +179,18 @@ export function SetupWizard() {
             size="fat"
             variant="primary"
             className="w-full"
-            disabled={busy}
+            disabled={busy || !createReady}
             aria-label={busy ? "Saving" : CREATE_MEALS_CTA}
             aria-busy={busy}
             onClick={() => void createMeals()}
           >
             <SetupSubmitLabel busy={busy} label={CREATE_MEALS_CTA} />
           </Button>
+          {wakeConfigured === false ? (
+            <p data-slot="finish-wake-first" className="type-meta text-center text-muted-foreground">
+              {FINISH_WAKE_BEFORE_CREATE}
+            </p>
+          ) : null}
           <Button
             type="button"
             size="fat"
@@ -425,7 +439,8 @@ export function SetupWizard() {
     case "create-meals":
       body = (
         <HouseCard data-slot="setup-card">
-          <p className="type-body text-muted-foreground">{meta.helper}</p>
+          <BotWakeSettings canEdit={owner} placement="setup" />
+          <p className="type-body mt-4 text-muted-foreground">{meta.helper}</p>
           <details className="mt-4" data-slot="diy-grok-paste">
             <summary className="type-body min-h-12 cursor-pointer list-inside font-medium text-primary">
               {DIY_GROK_PASTE_CTA}

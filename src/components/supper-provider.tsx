@@ -5,8 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { BallotToast } from "@/components/ballot-toast";
 import { botCheckForHousehold } from "@/lib/bot-check";
 import { patchPlanningPeople } from "@/lib/planning-people";
-import { shouldWakeNeedsWork } from "@/lib/bot-wake";
-import { requestBotWake } from "@/lib/bot-wake-client";
+import { FINISH_WAKE_BEFORE_CREATE, shouldWakeNeedsWork } from "@/lib/bot-wake";
+import { fetchBotWakeConfigured, requestBotWake } from "@/lib/bot-wake-client";
 import {
   PENDING_REFRESH_EVENT,
   markBotWakeNotified,
@@ -453,6 +453,15 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
     }
   }, [snapshot]);
 
+  const wakeWeekOrPlanChange = useCallback(() => {
+    const snap = displayRef.current;
+    if (!snap || !botCheckForHousehold(snap).needs_work) return;
+    requestPendingRefresh();
+    void requestBotWake("needs_work").then((result) => {
+      if (result === "posted" || result === "debounced") markBotWakeNotified();
+    });
+  }, []);
+
   const value = useMemo<SupperContextValue>(
     () => ({
       ready,
@@ -780,7 +789,13 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
         run(async () => {
           const client = createSupabaseBrowserClient();
           if (!client) throw new Error("Not signed in");
+          if (!(await fetchBotWakeConfigured())) {
+            throw new Error(FINISH_WAKE_BEFORE_CREATE);
+          }
           return supabaseRequestWeekBallot(client, startsOn);
+        }).then((weekId) => {
+          wakeWeekOrPlanChange();
+          return weekId;
         }),
       planNextWeek: () =>
         run(async () => {
@@ -788,6 +803,9 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
           if (!client) throw new Error("Not signed in");
           const id = await supabasePlanNextWeek(client);
           setViewedRole("planning");
+          return id;
+        }).then((id) => {
+          wakeWeekOrPlanChange();
           return id;
         }),
       savePlanningPeople: (counts, instructions) =>
@@ -799,12 +817,17 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
             if (!client) throw new Error("Not signed in");
             return supabaseSavePlanningPeople(client, counts, instructions);
           },
-        ),
+        ).then((id) => {
+          wakeWeekOrPlanChange();
+          return id;
+        }),
       saveWeekPeople: (weekId, counts, instructions) =>
         run(async () => {
           const client = createSupabaseBrowserClient();
           if (!client) throw new Error("Not signed in");
           await supabaseSaveWeekPeople(client, weekId, counts, instructions);
+        }).then(() => {
+          wakeWeekOrPlanChange();
         }),
       toggleSavedMeal: (mealId) => {
         const current = session;
@@ -897,7 +920,10 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
             if (result === "requested") setViewedWeek({ kind: "planning" });
             return result;
           },
-        );
+        ).then((result) => {
+          if (result === "requested") wakeWeekOrPlanChange();
+          return result;
+        });
       },
     }),
     // refresh/run close over the latest session and snapshot on each render.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Link from "next/link";
 import { BallotToast } from "@/components/ballot-toast";
 import { useBotJustNotified, useBotWakeConfigured, useWakeNow } from "@/components/use-bot-wake";
@@ -9,7 +9,6 @@ import { requestBotWake, type WakeClientResult } from "@/lib/bot-wake-client";
 import { BOT_CHECK_NOW_HINT, BOT_CHECK_NOW_LABEL } from "@/lib/bot-check";
 import { waitingWeekCue } from "@/lib/open-weeks";
 import {
-  POST_LOCK_BOT_CHECK_SETTINGS,
   POST_LOCK_BOT_NOTIFIED,
   POST_LOCK_GET_RECIPES_LABEL,
   POST_LOCK_WAKE_SETTINGS,
@@ -18,12 +17,10 @@ import {
   RECIPE_PENDING_BODY,
   RECIPE_PENDING_TITLE,
   getRecipesHint,
-  postLockWaitingCadenceLine,
   recipePendingHint,
   type LockedDinnerTap,
 } from "@/lib/post-lock-waiting";
 import type { WeekRole } from "@/lib/types";
-import type { BotCheckIntervalHours, BotCheckMode } from "@/lib/types";
 import {
   WAKE_CHECK_HINT,
   WAKE_CHECKING_LABEL,
@@ -42,20 +39,7 @@ import {
 
 type WaitingVoice = "recipes" | "meals";
 
-function useCadenceNow(lastCheckedAt: string | null | undefined): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!lastCheckedAt) return;
-    const id = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(id);
-  }, [lastCheckedAt]);
-  return now;
-}
-
 export function PostLockWaitingDetails({
-  mode,
-  intervalHours,
-  lastCheckedAt = null,
   showTitle = true,
   showBody = true,
   wakeConfigured,
@@ -66,9 +50,6 @@ export function PostLockWaitingDetails({
   voice = "recipes",
   className,
 }: {
-  mode: BotCheckMode;
-  intervalHours: BotCheckIntervalHours | null;
-  lastCheckedAt?: string | null;
   showTitle?: boolean;
   showBody?: boolean;
   wakeConfigured?: boolean;
@@ -80,8 +61,6 @@ export function PostLockWaitingDetails({
   className?: string;
 }) {
   const configured = useBotWakeConfigured(wakeConfigured);
-  const now = useCadenceNow(configured === true ? null : lastCheckedAt);
-  const cadence = postLockWaitingCadenceLine({ mode, intervalHours, lastCheckedAt, now });
   const heard = useBotJustNotified();
   const { phase, notified, message, dismiss, wake } = useWakeNow(async () => {
     return Promise.resolve(onGetRecipes ? onGetRecipes() : requestBotWake("check_now"));
@@ -117,11 +96,6 @@ export function PostLockWaitingDetails({
       {showBody ? (
         <p className={cn("type-body text-muted-foreground", showTitle && "mt-2")}>{body}</p>
       ) : null}
-      {configured === false ? (
-        <p data-slot="post-lock-cadence" className="type-meta mt-3 text-foreground">
-          {cadence}
-        </p>
-      ) : null}
       {!mealsVoice && justNotified ? (
         <p data-slot="post-lock-notified" className="type-meta mt-3 text-foreground">
           {POST_LOCK_BOT_NOTIFIED}
@@ -145,29 +119,23 @@ export function PostLockWaitingDetails({
       </div>
       <BallotToast message={message} onDismiss={dismiss} />
       <Link
-        href={wakeOn ? "/settings#wake-your-bot" : "/settings#bot-check"}
+        href="/settings#wake-your-bot"
         data-slot="post-lock-bot-settings"
         className="type-meta mt-4 inline-flex min-h-12 items-center font-semibold text-primary"
       >
-        {wakeOn ? POST_LOCK_WAKE_SETTINGS : POST_LOCK_BOT_CHECK_SETTINGS}
+        {POST_LOCK_WAKE_SETTINGS}
       </Link>
     </div>
   );
 }
 
 export function PostLockWaitingCard({
-  mode,
-  intervalHours,
-  lastCheckedAt = null,
   wakeConfigured,
   weekRole = "cooking",
   startsOn,
   bothOpen = false,
   className,
 }: {
-  mode: BotCheckMode;
-  intervalHours: BotCheckIntervalHours | null;
-  lastCheckedAt?: string | null;
   wakeConfigured?: boolean;
   weekRole?: WeekRole;
   startsOn?: string;
@@ -180,9 +148,6 @@ export function PostLockWaitingCard({
       className={cn("rounded-[14px] bg-card p-4 shadow-card ring-1 ring-primary/20", className)}
     >
       <PostLockWaitingDetails
-        mode={mode}
-        intervalHours={intervalHours}
-        lastCheckedAt={lastCheckedAt}
         wakeConfigured={wakeConfigured}
         weekRole={weekRole}
         startsOn={startsOn}
@@ -193,18 +158,12 @@ export function PostLockWaitingCard({
 }
 
 export function MealsWaitingCard({
-  mode,
-  intervalHours,
-  lastCheckedAt = null,
   wakeConfigured,
   weekRole = "cooking",
   startsOn,
   bothOpen = false,
   className,
 }: {
-  mode: BotCheckMode;
-  intervalHours: BotCheckIntervalHours | null;
-  lastCheckedAt?: string | null;
   wakeConfigured?: boolean;
   weekRole?: WeekRole;
   startsOn?: string;
@@ -217,9 +176,6 @@ export function MealsWaitingCard({
       className={cn("rounded-[14px] bg-card p-4 shadow-card ring-1 ring-primary/20", className)}
     >
       <PostLockWaitingDetails
-        mode={mode}
-        intervalHours={intervalHours}
-        lastCheckedAt={lastCheckedAt}
         wakeConfigured={wakeConfigured}
         weekRole={weekRole}
         startsOn={startsOn}
@@ -233,9 +189,6 @@ export function MealsWaitingCard({
 export function PostLockWaitingSheet({
   open,
   onOpenChange,
-  mode,
-  intervalHours,
-  lastCheckedAt = null,
   wakeConfigured,
   weekRole = "cooking",
   startsOn,
@@ -243,9 +196,6 @@ export function PostLockWaitingSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: BotCheckMode;
-  intervalHours: BotCheckIntervalHours | null;
-  lastCheckedAt?: string | null;
   wakeConfigured?: boolean;
   weekRole?: WeekRole;
   startsOn?: string;
@@ -259,9 +209,6 @@ export function PostLockWaitingSheet({
           <SheetDescription className="type-body text-muted-foreground">{POST_LOCK_WAITING_BODY}</SheetDescription>
         </SheetHeader>
         <PostLockWaitingDetails
-          mode={mode}
-          intervalHours={intervalHours}
-          lastCheckedAt={lastCheckedAt}
           showTitle={false}
           showBody={false}
           wakeConfigured={wakeConfigured}

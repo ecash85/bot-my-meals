@@ -4,7 +4,6 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PostLockWaitingCard, RecipePendingNotice } from "@/components/post-lock-waiting";
-import { BOT_CHECK_WAITING_ADAPTIVE } from "./bot-check";
 import {
   POST_LOCK_BOT_CHECK_SETTINGS,
   POST_LOCK_GET_RECIPES_HINT,
@@ -17,9 +16,7 @@ import {
   dinnerRecipeReady,
   isPendingBotFill,
   lockedDinnerTap,
-  nextCheckMinutes,
   nightShowsRecipePending,
-  postLockWaitingCadenceLine,
   type PendingBotFillInput,
 } from "./post-lock-waiting";
 import type { Meal, Membership, Recipe, ShoppingItem, Vote } from "./types";
@@ -160,53 +157,6 @@ describe("pending bot fill", () => {
   });
 });
 
-describe("post-lock waiting cadence", () => {
-  const now = new Date("2026-09-27T12:20:00.000Z");
-
-  it("uses the hourly waiting line when adaptive has no last check", () => {
-    expect(postLockWaitingCadenceLine({ mode: "adaptive", intervalHours: null, now })).toBe(
-      BOT_CHECK_WAITING_ADAPTIVE,
-    );
-    expect(postLockWaitingCadenceLine({ mode: "adaptive", intervalHours: null, now })).not.toMatch(
-      /Next check in about/,
-    );
-    expect(
-      postLockWaitingCadenceLine({
-        mode: "adaptive",
-        intervalHours: null,
-        lastCheckedAt: "not-a-time",
-        now,
-      }),
-    ).toBe(BOT_CHECK_WAITING_ADAPTIVE);
-  });
-
-  it("counts down from the last check and keeps the fixed cadence beside it", () => {
-    expect(nextCheckMinutes(null, 1, now)).toBeNull();
-    expect(nextCheckMinutes("2026-09-27T13:00:00.000Z", 1, now)).toBeNull();
-    expect(nextCheckMinutes("2026-09-27T12:00:00.000Z", 1, now)).toBe(40);
-    expect(nextCheckMinutes("2026-09-27T12:20:00.000Z", 1, now)).toBe(60);
-    expect(
-      postLockWaitingCadenceLine({
-        mode: "adaptive",
-        intervalHours: null,
-        lastCheckedAt: "2026-09-27T12:00:00.000Z",
-        now,
-      }),
-    ).toBe("Next check in about 40 min.");
-    expect(postLockWaitingCadenceLine({ mode: "fixed", intervalHours: 3, now })).toBe(
-      "Checks every 3 hours.",
-    );
-    expect(
-      postLockWaitingCadenceLine({
-        mode: "fixed",
-        intervalHours: 6,
-        lastCheckedAt: "2026-09-27T12:00:00.000Z",
-        now,
-      }),
-    ).toBe("Next check in about 340 min. · Checks every 6 hours.");
-  });
-});
-
 describe("post-lock waiting copy", () => {
   it("matches the lock and does not invent a cart, a price, or a push", () => {
     expect(POST_LOCK_WAITING_TITLE).toBe("Waiting for your Bot");
@@ -244,31 +194,26 @@ describe("post-lock waiting copy", () => {
 
   it("renders the waiting card and the recipe pending notice", () => {
     const card = renderToStaticMarkup(
-      createElement(PostLockWaitingCard, { mode: "adaptive", intervalHours: null, wakeConfigured: false }),
+      createElement(PostLockWaitingCard, { wakeConfigured: false }),
     );
     expect(card).toContain("Waiting for your Bot");
     expect(card).toContain("Recipes and your shopping list show up after your Bot My Meals bot runs.");
-    expect(card).toContain("Checks about every hour while you\u2019re waiting.");
+    expect(card).not.toContain("Checks about every hour");
+    expect(card).not.toContain("Checks every");
+    expect(card).not.toContain("Checks every 1 hour.");
+    expect(card).not.toContain("Next check");
+    expect(card).not.toContain("Next check in about");
+    expect(card).not.toContain("Adaptive");
     expect(card).toContain("Get recipes now");
     expect(card).toContain("This isn\u2019t a push from the app.");
-    expect(card).toContain('href="/settings#bot-check"');
+    expect(card).toContain('href="/settings#wake-your-bot"');
+    expect(card).not.toContain('href="/settings#bot-check"');
     expect(card).not.toContain("Open shopping list");
     expect(card).not.toContain("See recipes");
     expect(card).not.toContain("No recipe was saved");
 
-    const fixed = renderToStaticMarkup(
-      createElement(PostLockWaitingCard, { mode: "fixed", intervalHours: 1, wakeConfigured: false }),
-    );
-    expect(fixed).toContain("Checks every 1 hour.");
-    expect(fixed).not.toContain("Next check in about");
-
     const webhookOn = renderToStaticMarkup(
-      createElement(PostLockWaitingCard, {
-        mode: "adaptive",
-        intervalHours: null,
-        lastCheckedAt: "2026-09-27T12:00:00.000Z",
-        wakeConfigured: true,
-      }),
+      createElement(PostLockWaitingCard, { wakeConfigured: true }),
     );
     expect(webhookOn).toContain("Waiting for your Bot");
     expect(webhookOn).toContain("Get recipes now");

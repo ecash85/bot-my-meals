@@ -215,7 +215,7 @@ After Wake is saved, walk through house setup (no Seed/sample week). Progress is
 4. **Optional:** adjust plates on On nights (guests / couple nights).
 5. **Stores** — enter zip/postal, multi-select regional grocers, or type in a store. No default stores. Labels only — never invent grocery prices; cart adds only where the store actually supports them.
 6. **Optional** weekly meal budget (or skip).
-7. Tap **Create this week's meals** — app writes a ballot request and shows **Waiting for your Bot…** until the ballot appears. **Copy paste for your Grok Bot** is DIY fallback only (collapsed).
+7. **Wake your Bot** is required before **Create this week's meals**. Paste the Webhook URL on this step. The button stays off until it is saved. There is no Skip. After save: **Saved. Create this week’s meals will wake your bot.** Tap **Create this week's meals** — app writes a ballot request and shows **Waiting for your Bot…** until the ballot appears. **Copy paste for your Grok Bot** is DIY fallback only (collapsed).
 
 Empty This week: **Finish house setup** (if incomplete), **Create this week's meals** / **Waiting for your Bot…** (if setup done), or the dual-approve ballot when it lands. When **House → Wake your Bot** / `BOT_WAKE` is configured (`configured` true), Waiting / Check now is wake / instant / **Your bot was notified** only.
 
@@ -322,7 +322,7 @@ After Create household, create Wake on app event and paste Webhook URL into Hous
 4) Optional: adjust plates on On nights (guests / couple nights).
 5) Stores — enter zip/postal, multi-select regional grocers, or type in a store. No default stores. Labels only — never invent grocery prices; cart adds only where the store actually supports them.
 6) Optional weekly meal budget (or skip).
-7) Tap Create this week's meals — app writes a ballot request and shows Waiting for your Bot… until the ballot appears. Copy paste for your Grok Bot is DIY fallback only (collapsed).
+7) Wake your Bot is required before Create this week's meals. Paste the Webhook URL on this step. Create this week's meals stays off until it is saved. There is no Skip. After save: Saved. Create this week’s meals will wake your bot. Tap Create this week's meals — app writes a ballot request and shows Waiting for your Bot… until the ballot appears. Copy paste for your Grok Bot is DIY fallback only (collapsed).
 Empty This week: Finish house setup (if incomplete), Create this week's meals / Waiting for your Bot… (if setup done), or the dual-approve ballot when it lands. When House → Wake your Bot / BOT_WAKE is configured (configured true), Waiting / Check now is wake / instant / Your bot was notified only. Without wake configured, setup is incomplete — Check now still means message the Bot, but Install must still create and save the webhook. Do not create Adaptive / @every 1h / @every 6h bot-check routines.
 
 After the first ballot is live, the house may also plan next week while cooking this week. Day-1 Install is still one cooking week — do not create a planning week during setup.
@@ -335,7 +335,7 @@ Check now / Get recipes now shows Checking… / Waking… until the request sett
 
 Saved → Request for next week always targets the planning week. Create that week if it is missing. People per night first (optional Special instructions) before that week’s ballot. Confirm Requested for next week. Do not request a week after next.
 
-On wake, do the work when needs_work is true on any open week, including fill_pending after lock when that week's recipes or shopping list are still empty. Fulfill by week. Do not treat a settled cooking week as idle if the planning week still needs work. Stay silent when nothing changed — no “no update” message. When Wake / webhook is configured (configured true), Waiting / Check now is wake / Your bot was notified only. Without wake configured, setup is incomplete — Check now still means message the Bot, but Install must still create and save the webhook. Do not create Adaptive / @every 1h / @every 6h bot-check routines.
+On each wake, GET /api/bot/status with a household member access token (Authorization: Bearer). Do the work when needs_work is true on any open week, including fill_pending after lock when that week's recipes or shopping list are still empty. Fulfill by week. Do not treat a settled cooking week as idle if the planning week still needs work. Stay silent when nothing changed — no “no update” message. When Wake / webhook is configured (configured true), Waiting / Check now is wake / Your bot was notified only. Without wake configured, setup is incomplete — Check now still means message the Bot, but Install must still create and save the webhook. Do not create Adaptive / @every 1h / @every 6h bot-check routines.
 
 Rules: easy for anyone; never invent grocery prices; cart adds only where the store actually supports them (don’t claim Smith’s or any store cart add unless it’s real). Do NOT invent prices. Do NOT claim unsupported cart features. Don’t stop at “try it without Supabase.” Worker name stays bot-my-meals.
 ```

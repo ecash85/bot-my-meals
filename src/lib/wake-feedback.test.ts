@@ -65,8 +65,6 @@ describe("wake feedback copy", () => {
   it("shows a waiting card for meals and a quiet placeholder on a blank slot", () => {
     const card = renderToStaticMarkup(
       createElement(MealsWaitingCard, {
-        mode: "adaptive",
-        intervalHours: null,
         wakeConfigured: true,
         weekRole: "planning",
         startsOn: "2026-10-04",
@@ -87,12 +85,12 @@ describe("wake feedback copy", () => {
 
     const quiet = renderToStaticMarkup(
       createElement(MealsWaitingCard, {
-        mode: "adaptive",
-        intervalHours: null,
         wakeConfigured: false,
       }),
     );
-    expect(quiet).toContain("Checks about every hour while you\u2019re waiting.");
+    expect(quiet).not.toContain("Checks about every hour");
+    expect(quiet).not.toContain("Next check");
+    expect(quiet).not.toContain("Adaptive");
     expect(quiet).toContain("This isn\u2019t a push from the app.");
     expect(quiet).not.toContain(WAKE_MEALS_NOTIFIED);
 

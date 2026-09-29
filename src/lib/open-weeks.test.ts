@@ -103,8 +103,6 @@ describe("open weeks", () => {
   it("names next week on the waiting card", () => {
     const html = renderToStaticMarkup(
       createElement(PostLockWaitingCard, {
-        mode: "adaptive",
-        intervalHours: null,
         weekRole: "planning",
         startsOn: "2026-10-04",
         wakeConfigured: false,

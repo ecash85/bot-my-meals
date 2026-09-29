@@ -151,6 +151,9 @@ describe("wizard v2 house setup", () => {
     expect(prompt).toMatch(/Sun 4/);
     expect(prompt).toMatch(/Harmons/);
     expect(prompt).toMatch(/WinCo/);
+    expect(prompt).toMatch(/required before Create this week's meals/);
+    expect(prompt).toMatch(/There is no Skip/);
+    expect(prompt).not.toMatch(/Adaptive|@every|Optional/i);
     expect(prompt).toMatch(/Never invent grocery prices/);
     expect(prompt).toMatch(/Never claim Smith's cart adds/);
     expect(prompt).not.toMatch(/sample week/i);
@@ -208,6 +211,9 @@ describe("house setup surfaces", () => {
     expect(wizard).toContain("WeeklyBudgetField");
     expect(wizard).toContain('budget.trim() ? "Continue" : "Skip"');
     expect(wizard).toContain("CREATE_MEALS_CTA");
+    expect(wizard).toContain('placement="setup"');
+    expect(wizard).toContain("disabled={busy || !createReady}");
+    expect(wizard).toContain("FINISH_WAKE_BEFORE_CREATE");
     expect(wizard).toContain("DIY_GROK_PASTE_CTA");
     expect(wizard).toContain("household-size");
     expect(wizard).toContain("NightToggles");
@@ -237,6 +243,8 @@ describe("house setup surfaces", () => {
     expect(week).toContain("requestWeekBallot");
     expect(week).toContain("waiting-for-bot");
     expect(provider).toContain("requestWeekBallot");
+    expect(provider).toContain("fetchBotWakeConfigured");
+    expect(provider).toContain("FINISH_WAKE_BEFORE_CREATE");
     expect(provider).toContain('table: "ballot_requests"');
     expect(provider).not.toContain("localStorage");
     expect(types).toContain("setupStep");

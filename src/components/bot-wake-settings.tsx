@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { BotCheckNow } from "@/components/bot-check-frequency";
 import { HouseCard } from "@/components/house-card";
 import { markBotWakeConfigured, useBotWakeConfigured } from "@/components/use-bot-wake";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  BOT_WAKE_CREATE_BODY,
+  BOT_WAKE_CREATE_SAVED,
   BOT_WAKE_EMPTY,
   BOT_WAKE_KEY_HELPER,
   BOT_WAKE_KEY_LABEL,
@@ -23,9 +26,11 @@ import { saveBotWakeSettings } from "@/lib/bot-wake-client";
 export function BotWakeSettings({
   canEdit,
   configured: configuredOverride,
+  placement = "settings",
 }: {
   canEdit: boolean;
   configured?: boolean;
+  placement?: "settings" | "setup";
 }) {
   const fetched = useBotWakeConfigured(configuredOverride) === true;
   const [justSaved, setJustSaved] = useState(false);
@@ -36,15 +41,25 @@ export function BotWakeSettings({
   const [busy, setBusy] = useState(false);
   const showSaved = fetched || justSaved;
   const showForm = canEdit && (!showSaved || replacing);
+  const savedLine = wakeSavedLine(placement);
 
   return (
-    <HouseCard id="wake-your-bot" className="mt-6 scroll-mt-24" data-slot="bot-wake-settings">
+    <HouseCard
+      id="wake-your-bot"
+      className={placement === "setup" ? "scroll-mt-24" : "mt-6 scroll-mt-24"}
+      data-slot="bot-wake-settings"
+    >
       <h2 className="type-section text-primary">{BOT_WAKE_SECTION_LABEL}</h2>
-      {canEdit ? <p className="type-meta mt-1 text-muted-foreground">{BOT_WAKE_URL_HELPER}</p> : null}
+      {canEdit && placement === "settings" ? (
+        <p className="type-meta mt-1 text-muted-foreground">{BOT_WAKE_URL_HELPER}</p>
+      ) : null}
+      {canEdit && placement === "setup" && !showSaved ? (
+        <p className="type-meta mt-1 text-muted-foreground">{BOT_WAKE_CREATE_BODY}</p>
+      ) : null}
       {showSaved ? (
         <div className="mt-3 space-y-3">
           <p data-slot="bot-wake-saved" className="type-meta text-foreground">
-            {BOT_WAKE_SAVED}
+            {savedLine}
           </p>
           {canEdit && !replacing ? (
             <Button
@@ -125,6 +140,20 @@ export function BotWakeSettings({
           {error ? <p className="type-meta text-destructive">{error}</p> : null}
         </form>
       ) : null}
+      {placement === "settings" ? <BotCheckNow wakeConfigured={configuredOverride} /> : null}
     </HouseCard>
   );
+}
+
+function wakeSavedLine(placement: "settings" | "setup"): string {
+  switch (placement) {
+    case "settings":
+      return BOT_WAKE_SAVED;
+    case "setup":
+      return BOT_WAKE_CREATE_SAVED;
+    default: {
+      const _exhaustive: never = placement;
+      return _exhaustive;
+    }
+  }
 }

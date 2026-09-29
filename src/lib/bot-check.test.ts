@@ -3,7 +3,7 @@ import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BotCheckFrequency, WaitingBotCheck } from "@/components/bot-check-frequency";
+import { WaitingBotCheck } from "@/components/bot-check-frequency";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { grokBotPastePrompt } from "./house-setup";
 import { supabaseBotCheckStatus } from "./supabase/repo";
@@ -231,7 +231,7 @@ describe("bot status needs_work reasons", () => {
     const waitingHtml = renderToStaticMarkup(
       createElement(WaitingBotCheck, { status: gap, pendingWorkOnly: true, wakeConfigured: false }),
     );
-    expect(waitingHtml).toContain("Checks about every hour while you\u2019re waiting.");
+    expect(waitingHtml).not.toContain("Checks about every hour");
     expect(waitingHtml).toContain("Check now");
     expect(status({ fillPending: true, setupComplete: false }).reason).toBe("fill_pending");
     expect(status({ fillPending: true, ballotStatus: "pending" }).reason).toBe("pending_ballot");
@@ -385,26 +385,7 @@ describe("Settings and Waiting copy lock", () => {
     expect(waitingCadenceLine(fixed)).not.toBe(BOT_CHECK_WAITING_ADAPTIVE);
   });
 
-  it("renders the Settings radios and the Waiting cadence with the lock copy", () => {
-    const settingsHtml = renderToStaticMarkup(
-      createElement(BotCheckFrequency, {
-        mode: "adaptive",
-        intervalHours: null,
-        canEdit: true,
-        onChange: async () => undefined,
-      }),
-    );
-    expect(settingsHtml).toContain("Bot check frequency");
-    expect(settingsHtml).toContain("Adaptive (recommended)");
-    expect(settingsHtml).toContain("Every hour while you\u2019re setting up or waiting; every 6 hours when nothing is waiting.");
-    expect(settingsHtml).toContain("Every hour");
-    expect(settingsHtml).toContain("Every 3 hours");
-    expect(settingsHtml).toContain("Every 6 hours");
-    expect(settingsHtml).toContain("Check now");
-    expect(settingsHtml).toContain("This isn\u2019t a push from the app.");
-    expect(settingsHtml).toContain('role="radiogroup"');
-    expect(settingsHtml).not.toContain("Force sync");
-
+  it("renders Check now on Waiting without a cadence line", () => {
     const waitingHtml = renderToStaticMarkup(
       createElement(WaitingBotCheck, {
         status: status({ ballotStatus: "pending" }),
@@ -412,8 +393,11 @@ describe("Settings and Waiting copy lock", () => {
         wakeConfigured: false,
       }),
     );
-    expect(waitingHtml).toContain("Checks about every hour while you\u2019re waiting.");
+    expect(waitingHtml).not.toContain("Checks about every hour");
+    expect(waitingHtml).not.toContain("Adaptive");
+    expect(waitingHtml).not.toContain("Every hour");
     expect(waitingHtml).toContain("Check now");
+    expect(waitingHtml).toContain("This isn\u2019t a push from the app.");
 
     const settledHtml = renderToStaticMarkup(
       createElement(WaitingBotCheck, {
@@ -430,8 +414,9 @@ describe("Settings and Waiting copy lock", () => {
         wakeConfigured: false,
       }),
     );
-    expect(fixedHtml).toContain("Checks every 6 hours.");
+    expect(fixedHtml).not.toContain("Checks every 6 hours.");
     expect(fixedHtml).not.toContain("Checks about every hour");
+    expect(fixedHtml).not.toContain("Next check");
 
     const webhookOn = renderToStaticMarkup(
       createElement(WaitingBotCheck, {
@@ -443,24 +428,30 @@ describe("Settings and Waiting copy lock", () => {
     expect(webhookOn).not.toContain("Checks about every hour");
     expect(webhookOn).not.toContain("Checks every");
     expect(webhookOn).not.toContain("Next check");
+    expect(webhookOn).not.toContain("Every hour");
+    expect(webhookOn).not.toContain("every 6 hours");
+    expect(webhookOn).toContain("Wakes your Bot My Meals bot now.");
   });
 
-  it("puts the radio list on House settings and the cadence on Waiting, without a fake push", () => {
+  it("keeps Check now off a frequency control and out of setup", () => {
     const settings = readFileSync(path.join(srcRoot, "app/settings/page.tsx"), "utf8");
     const week = readFileSync(path.join(srcRoot, "app/week/page.tsx"), "utf8");
     const card = readFileSync(path.join(srcRoot, "components/bot-check-frequency.tsx"), "utf8");
+    const wakeSettings = readFileSync(path.join(srcRoot, "components/bot-wake-settings.tsx"), "utf8");
     const wake = readFileSync(path.join(srcRoot, "components/use-bot-wake.ts"), "utf8");
     const wizard = readFileSync(path.join(srcRoot, "components/setup-wizard.tsx"), "utf8");
     const setupPage = readFileSync(path.join(srcRoot, "app/setup/page.tsx"), "utf8");
 
-    expect(settings).toContain("BotCheckFrequency");
-    expect(settings).toContain("canEdit={owner}");
+    expect(settings).toContain("BotWakeSettings");
+    expect(settings).not.toContain("BotCheckFrequency");
+    expect(settings).not.toContain("bot-check-frequency");
+    expect(wakeSettings).toContain("BotCheckNow");
     expect(week).toContain("WaitingBotCheck");
     expect(week).toContain("waiting-for-bot");
     expect(week).toContain("EMPTY_WEEK_WAITING_TITLE");
-    expect(card).toContain('role="radiogroup"');
-    expect(card).toContain('role="radio"');
-    expect(card).toContain("BOT_CHECK_SECTION_LABEL");
+    expect(card).not.toContain('role="radiogroup"');
+    expect(card).not.toContain("BOT_CHECK_SECTION_LABEL");
+    expect(card).not.toContain("bot-check-cadence");
     expect(card).toContain("BOT_CHECK_NOW_HINT");
     expect(card).not.toContain("Force sync");
     expect(card).not.toMatch(/APNs|Instant push|phone push/);
@@ -493,7 +484,7 @@ describe("bot check migration and shared-bot docs", () => {
     expect(sql).not.toMatch(/service_role/i);
   });
 
-  it("tells a shared bot to use an adaptive routine and the status endpoint", () => {
+  it("tells a shared bot to wake and fulfill needs_work without an hour schedule", () => {
     const docs = readFileSync(path.join(repoRoot, "docs/bot-routines.md"), "utf8");
     const readme = readFileSync(path.join(repoRoot, "README.md"), "utf8");
     const agents = readFileSync(path.join(repoRoot, "AGENTS.md"), "utf8");
@@ -505,9 +496,11 @@ describe("bot check migration and shared-bot docs", () => {
       weeklyBudgetCents: null,
     });
 
-    expect(docs).toMatch(/@every 1h/);
-    expect(docs).toMatch(/@every 6h/);
-    expect(docs).toMatch(/@every 3h/);
+    expect(docs).toMatch(/Wake on app event/);
+    expect(docs).toMatch(/required before Create this week's meals/);
+    expect(docs).not.toMatch(/@every/);
+    expect(docs).not.toMatch(/Adaptive/);
+    expect(docs).not.toMatch(/Bot check frequency/);
     expect(docs).toMatch(/\/api\/bot\/status/);
     expect(docs).toMatch(/needs_work/);
     expect(docs).toMatch(/fill_pending/);
@@ -521,8 +514,11 @@ describe("bot check migration and shared-bot docs", () => {
     expect(readme).not.toMatch(/about every hour while/);
     expect(readme).not.toMatch(/every 6 hours when the week is settled/);
     expect(agents).toMatch(/docs\/bot-routines\.md/);
-    expect(paste).toMatch(/@every 1h/);
-    expect(paste).toMatch(/@every 6h/);
+    expect(paste).toMatch(/required before Create this week's meals/);
+    expect(paste).not.toMatch(/Adaptive/i);
+    expect(paste).not.toMatch(/@every/);
+    expect(paste).not.toMatch(/Bot check frequency/);
+    expect(paste).not.toMatch(/silent backend fallback/);
     expect(paste).toMatch(/\/api\/bot\/status/);
     expect(paste).toMatch(/stay silent/i);
     expect(paste).not.toContain("dual-approve");

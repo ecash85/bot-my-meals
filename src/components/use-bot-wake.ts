@@ -10,8 +10,8 @@ export const PENDING_REFRESH_EVENT = "bot-pending-refresh";
 export const BOT_WAKE_NOTIFIED_EVENT = "bot-wake-notified";
 
 /**
- * Null until GET /api/bot/wake answers. Callers that show hour cadence must
- * wait for false — unknown is not a license to advertise the poll.
+ * Null until GET /api/bot/wake answers. Unknown is not configured.
+ * Create stays off until this is true.
  */
 export function useBotWakeConfigured(override?: boolean): boolean | null {
   const [configured, setConfigured] = useState<boolean | null>(override ?? null);
