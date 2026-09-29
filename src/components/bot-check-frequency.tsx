@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BallotToast } from "@/components/ballot-toast";
 import { HouseCard } from "@/components/house-card";
 import { useBotWakeConfigured, useWakeNow } from "@/components/use-bot-wake";
-import { Button } from "@/components/ui/button";
+import { OfflineAskButton, WakePhaseButton } from "@/components/wake-button";
 import {
   BOT_CHECK_HELPER,
   BOT_CHECK_NOW_HINT,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/bot-check";
 import { BOT_CHECK_NOW_WAKE_HINT } from "@/lib/bot-wake";
 import type { WakeClientResult } from "@/lib/bot-wake-client";
+import { WAKE_CHECKING_LABEL, WAKE_MEALS_NOTIFIED } from "@/lib/wake-feedback";
 import type { BotCheckIntervalHours, BotCheckMode, HouseholdSettingsPatch } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -35,27 +36,31 @@ export function BotCheckNow({
   hint?: string;
   wakeHint?: string;
 }) {
-  const configured = useBotWakeConfigured(wakeConfigured) === true;
-  const { busy, message, dismiss, wake } = useWakeNow(onCheckNow);
-  const hint = configured ? (wakeHint ?? BOT_CHECK_NOW_WAKE_HINT) : (hintOverride ?? BOT_CHECK_NOW_HINT);
+  const configured = useBotWakeConfigured(wakeConfigured);
+  const wakeOn = configured === true;
+  const { phase, notified, message, dismiss, wake } = useWakeNow(onCheckNow);
+  const hint = wakeOn ? (wakeHint ?? BOT_CHECK_NOW_WAKE_HINT) : (hintOverride ?? BOT_CHECK_NOW_HINT);
 
   return (
-    <div data-slot="bot-check-now" data-wake={configured ? "on" : "off"} className={cn("mt-4", className)}>
-      {configured ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="fat"
+    <div data-slot="bot-check-now" data-wake={wakeOn ? "on" : "off"} className={cn("mt-4", className)}>
+      {wakeOn ? (
+        <WakePhaseButton
+          phase={phase}
+          idleLabel={BOT_CHECK_NOW_LABEL}
+          wakingLabel={WAKE_CHECKING_LABEL}
+          onWake={wake}
           className="w-full"
-          disabled={busy}
-          aria-busy={busy}
-          onClick={wake}
-        >
-          {BOT_CHECK_NOW_LABEL}
-        </Button>
+        />
+      ) : configured === false ? (
+        <OfflineAskButton idleLabel={BOT_CHECK_NOW_LABEL} className="w-full" />
       ) : (
         <p className="type-body font-semibold">{BOT_CHECK_NOW_LABEL}</p>
       )}
+      {wakeOn && notified ? (
+        <p data-slot="wake-notified" className="type-meta mt-2 text-foreground">
+          {WAKE_MEALS_NOTIFIED}
+        </p>
+      ) : null}
       <p className="type-meta mt-1 text-muted-foreground">{hint}</p>
       <BallotToast message={message} onDismiss={dismiss} />
     </div>

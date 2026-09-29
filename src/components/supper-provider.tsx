@@ -7,6 +7,12 @@ import { botCheckForHousehold } from "@/lib/bot-check";
 import { patchPlanningPeople } from "@/lib/planning-people";
 import { shouldWakeNeedsWork } from "@/lib/bot-wake";
 import { requestBotWake } from "@/lib/bot-wake-client";
+import {
+  PENDING_REFRESH_EVENT,
+  markBotWakeNotified,
+  requestPendingRefresh,
+} from "@/components/use-bot-wake";
+import { PENDING_REFRESH_INTERVAL_MS, PENDING_REFRESH_WINDOW_MS } from "@/lib/wake-feedback";
 import { storeSlugForAdd } from "@/lib/grocers";
 import { createId } from "@/lib/ids";
 import { todayInTimeZone } from "@/lib/meal-history";
@@ -399,6 +405,38 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const needsWorkRef = useRef<boolean | null>(null);
+  const burstRef = useRef<number | null>(null);
+  const stopBurst = useCallback(() => {
+    if (burstRef.current == null) return;
+    window.clearInterval(burstRef.current);
+    burstRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const start = () => {
+      stopBurst();
+      const endsAt = Date.now() + PENDING_REFRESH_WINDOW_MS;
+      void refresh();
+      burstRef.current = window.setInterval(() => {
+        if (Date.now() >= endsAt) {
+          stopBurst();
+          return;
+        }
+        void refresh();
+      }, PENDING_REFRESH_INTERVAL_MS);
+    };
+    window.addEventListener(PENDING_REFRESH_EVENT, start);
+    return () => {
+      window.removeEventListener(PENDING_REFRESH_EVENT, start);
+      stopBurst();
+    };
+  }, [refresh, stopBurst]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    if (!botCheckForHousehold(snapshot).needs_work) stopBurst();
+  }, [snapshot, stopBurst]);
+
   useEffect(() => {
     if (!snapshot) {
       needsWorkRef.current = null;
@@ -408,7 +446,10 @@ function SupabaseSupperProvider({ children }: { children: React.ReactNode }) {
     const previous = needsWorkRef.current;
     needsWorkRef.current = needs;
     if (shouldWakeNeedsWork(previous, needs)) {
-      void requestBotWake("needs_work");
+      requestPendingRefresh();
+      void requestBotWake("needs_work").then((result) => {
+        if (result === "posted" || result === "debounced") markBotWakeNotified();
+      });
     }
   }, [snapshot]);
 

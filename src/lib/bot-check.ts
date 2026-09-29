@@ -1,6 +1,7 @@
 import { headcountForNight, normalizeNightHeadcounts } from "./headcount";
 import { clampHouseholdSize, isHouseSetupComplete, parseBallotRequestStatus } from "./house-setup";
 import { nightLifecycle } from "./lock";
+import { awaitingMealSlot } from "./ballot";
 import { isPendingBotFill } from "./post-lock-waiting";
 import type {
   BallotRequest,
@@ -86,6 +87,8 @@ export type BotWorkMeal = {
   lifecycle: NightLifecycle;
   servings: number;
   expectedServings: number;
+  /** Blank dinner slot waiting for a title. A removed night is not this. */
+  awaitingTitle?: boolean;
 };
 
 const ADAPTIVE_ACTIVE_HOURS = 1;
@@ -231,7 +234,14 @@ export function botWorkReason(input: {
   const plateDrift = ballotWritten && (sizeDrift || !sameHeadcounts(input.ballotNightHeadcounts, input.nightHeadcounts));
 
   if (input.ballotStatus === "pending") return "pending_ballot";
-  if (input.meals.some((meal) => meal.lifecycle === "swapped" || meal.lifecycle === "request_new_meal")) {
+  if (
+    input.meals.some(
+      (meal) =>
+        meal.awaitingTitle === true ||
+        meal.lifecycle === "swapped" ||
+        meal.lifecycle === "request_new_meal",
+    )
+  ) {
     return "meal_pending";
   }
   if (plateDrift && portionGap) return "plate_or_people_change";
@@ -429,6 +439,7 @@ function mealFacts(
   const source = weekPlates ? { ...household, nightHeadcounts: weekPlates } : null;
   return meals.map((meal) => ({
     lifecycle: nightLifecycle(meal, votes, memberships),
+    awaitingTitle: awaitingMealSlot(meal, votes, memberships),
     servings: meal.servings,
     expectedServings: source
       ? headcountForNight(source, meal.nightDate)

@@ -126,11 +126,19 @@ export function shoppingListTitle(role: WeekRole): string {
   }
 }
 
-/** Shown with Waiting only while Next week is the week on screen. */
-export function waitingWeekCue(role: WeekRole, startsOn: string): string | null {
+/**
+ * Names the week on Waiting when both weeks are open.
+ * Next week always carries its range. This week only when a planning week exists too.
+ */
+export function waitingWeekCue(
+  role: WeekRole,
+  startsOn: string,
+  options?: { bothOpen?: boolean },
+): string | null {
   switch (role) {
     case "cooking":
-      return null;
+      if (!options?.bothOpen) return null;
+      return `This week · ${formatWeekRange(startsOn)}`;
     case "planning":
       return `Next week · ${formatWeekRange(startsOn)}`;
     default: {

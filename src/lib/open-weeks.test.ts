@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PostLockWaitingCard } from "@/components/post-lock-waiting";
-import { addDays } from "./dates";
+import { addDays, formatWeekRange } from "./dates";
 import {
   PLAN_NEXT_WEEK_LABEL,
   planningTargetStarts,
@@ -49,6 +49,9 @@ describe("open weeks", () => {
     expect(shoppingListTitle("cooking")).toBe("Shopping · This week");
     expect(shoppingListTitle("planning")).toBe("Shopping · Next week");
     expect(waitingWeekCue("cooking", cookingStart)).toBeNull();
+    expect(waitingWeekCue("cooking", cookingStart, { bothOpen: true })).toBe(
+      `This week · ${formatWeekRange(cookingStart)}`,
+    );
     expect(waitingWeekCue("planning", "2026-10-04")).toBe("Next week · Oct 4 – Oct 10");
   });
 

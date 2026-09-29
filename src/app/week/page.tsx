@@ -12,7 +12,9 @@ import { BallotToast } from "@/components/ballot-toast";
 import { EmptyDayCard } from "@/components/empty-day-card";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LockBar } from "@/components/lock-bar";
-import { LockedNightFrame, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
+import { EditNightsControl } from "@/components/edit-nights-control";
+import { LockedNightFrame, MealsWaitingCard, PostLockWaitingCard, PostLockWaitingSheet } from "@/components/post-lock-waiting";
+import { requestPendingRefresh } from "@/components/use-bot-wake";
 import { PastWeekDetail } from "@/components/past-weeks";
 import { EditNightsSheet } from "@/components/edit-nights-sheet";
 import { PlanningPeopleGate } from "@/components/planning-people-gate";
@@ -27,13 +29,14 @@ import { isAdmin } from "@/lib/users";
 import { Button } from "@/components/ui/button";
 import {
   EMPTY_WEEK_WAITING_TITLE,
+  awaitingMealSlot,
   emptyWeekPresentation,
   isMutedBallotNight,
   weekNightPresentation,
   type EmptyWeekAction,
   type WeekNightPresentation,
 } from "@/lib/ballot";
-import { botCheckForHousehold } from "@/lib/bot-check";
+import { botCheckForHousehold, botCheckForSnapshot } from "@/lib/bot-check";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import {
@@ -251,6 +254,30 @@ function WeekBallot() {
       peopleConfirmedAt: scope.week.peopleConfirmedAt,
       mealCount: scope.meals.length,
     });
+  const viewedWork =
+    scope == null
+      ? null
+      : botCheckForSnapshot({
+          household: snapshot.household,
+          meals: scope.meals,
+          votes: scope.votes,
+          memberships: snapshot.memberships,
+          ballotRequest: scope.ballotRequest,
+          week: scope.week,
+          recipes: scope.recipes,
+          shoppingList: scope.shoppingList,
+        });
+  const showMealsWaiting =
+    !viewingPast && !showPeopleGate && Boolean(viewedWork?.needs_work) && !pendingFill;
+  const waitingCard = (
+    <MealsWaitingCard
+      mode={snapshot.household.botCheckMode}
+      intervalHours={snapshot.household.botCheckIntervalHours}
+      weekRole={role}
+      startsOn={scope?.week.startsOn ?? snapshot.week.startsOn}
+      bothOpen={hasPlanning}
+    />
+  );
 
   const act = async (mealId: string, choice: VoteChoice, note?: string) => {
     try {
@@ -267,6 +294,16 @@ function WeekBallot() {
       eyebrow={eyebrow?.text}
       eyebrowMuted={eyebrow?.muted}
       titleAside={locked ? <UnlockWeekControl variant="inline" /> : undefined}
+      titleAction={
+        showEditNightsEntry({
+          past: viewingPast,
+          locked: Boolean(locked),
+          canEdit: Boolean(session?.membershipId) && canActOnBallot(session?.role),
+          peopleGate: showPeopleGate,
+        }) ? (
+          <EditNightsControl onEdit={() => setEditWeekId(scope?.week.id ?? null)} />
+        ) : null
+      }
       chrome={
         <WeekChrome
           startsOn={activeStop?.startsOn ?? snapshot.week.startsOn}
@@ -295,16 +332,6 @@ function WeekBallot() {
                 }
               : null
           }
-          editNights={
-            showEditNightsEntry({
-              past: viewingPast,
-              locked: Boolean(locked),
-              canEdit: Boolean(session?.membershipId) && canActOnBallot(session?.role),
-              peopleGate: showPeopleGate,
-            })
-              ? { onEdit: () => setEditWeekId(scope?.week.id ?? null) }
-              : null
-          }
         />
       }
       status={undefined}
@@ -318,16 +345,27 @@ function WeekBallot() {
           household={snapshot.household}
           canEdit={Boolean(session?.membershipId) && canActOnBallot(session?.role)}
           busy={planning}
-          onSave={(counts, instructions) => savePlanningPeople(counts, instructions).then(() => undefined)}
+          onSave={(counts, instructions) =>
+            savePlanningPeople(counts, instructions).then(() => {
+              requestPendingRefresh();
+            })
+          }
           onBack={() => {
             setViewedWeek({ kind: "cooking" });
             router.replace(navigatorHref({ kind: "cooking" }), { scroll: false });
           }}
         />
       ) : nights.length === 0 ? (
-        <EmptyWeek onCreateMeals={() => requestWeekBallot(scope?.week.startsOn)} />
+        showMealsWaiting ? (
+          <div data-slot="waiting-for-bot" data-state="pending">
+            {waitingCard}
+          </div>
+        ) : (
+          <EmptyWeek onCreateMeals={() => requestWeekBallot(scope?.week.startsOn)} />
+        )
       ) : (
         <div className="space-y-3">
+          {showMealsWaiting ? <div data-slot="meals-pending">{waitingCard}</div> : null}
           {pendingFill ? (
             <div data-slot="week-pending-fill" data-state="pending" className="mb-4">
               <PostLockWaitingCard
@@ -335,16 +373,19 @@ function WeekBallot() {
                 intervalHours={snapshot.household.botCheckIntervalHours}
                 weekRole={role}
                 startsOn={scope?.week.startsOn ?? snapshot.week.startsOn}
+                bothOpen={hasPlanning}
               />
             </div>
           ) : null}
-          <WaitingBotCheck
-            status={botCheck}
-            pendingWorkOnly
-            className="mb-1"
-            checkNowHint={role === "planning" ? POST_LOCK_GET_RECIPES_NEXT_HINT : undefined}
-            checkNowWakeHint={role === "planning" ? POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT : undefined}
-          />
+          {!showMealsWaiting && !pendingFill ? (
+            <WaitingBotCheck
+              status={botCheck}
+              pendingWorkOnly
+              className="mb-1"
+              checkNowHint={role === "planning" ? POST_LOCK_GET_RECIPES_NEXT_HINT : undefined}
+              checkNowWakeHint={role === "planning" ? POST_LOCK_GET_RECIPES_NEXT_WAKE_HINT : undefined}
+            />
+          ) : null}
           {nights.map((meal) => {
             const dayLabel = formatMealCardDayLabel(meal.nightDate);
             const dayName = weekdayLabelFromNight(meal.nightDate);
@@ -358,6 +399,7 @@ function WeekBallot() {
             const canVote =
               Boolean(session?.membershipId) && canActOnBallot(session?.role) && !nightLocked;
             const presentation = weekNightPresentation(lifecycle, nightLocked);
+            const awaitingMeal = awaitingMealSlot(meal, scope?.votes ?? [], snapshot.memberships);
 
             return (
               <div
@@ -373,6 +415,7 @@ function WeekBallot() {
                   dayName,
                   meal,
                   latestNote: latest?.note,
+                  awaitingMeal,
                   canVote,
                   locked: nightLocked,
                   pending: pendingFill,
@@ -420,8 +463,8 @@ function WeekBallot() {
             if (!open) setEditWeekId(null);
           }}
           onSave={(counts, instructions) => saveWeekPeople(scope.week.id, counts, instructions)}
-          onSaved={(message) => {
-            if (message) setToast(message);
+          onSaved={() => {
+            requestPendingRefresh();
           }}
         />
       ) : null}
@@ -433,6 +476,7 @@ function WeekBallot() {
         intervalHours={snapshot.household.botCheckIntervalHours}
         weekRole={role}
         startsOn={scope?.week.startsOn ?? past?.startsOn ?? snapshot.week.startsOn}
+        bothOpen={hasPlanning}
       />
     </AppShell>
   );
@@ -444,6 +488,7 @@ function renderNightCard({
   dayName,
   meal,
   latestNote,
+  awaitingMeal,
   canVote,
   locked,
   pending,
@@ -456,6 +501,7 @@ function renderNightCard({
   dayName: string;
   meal: Meal;
   latestNote?: string;
+  awaitingMeal: boolean;
   canVote: boolean;
   locked: boolean;
   pending: boolean;
@@ -469,8 +515,12 @@ function renderNightCard({
         <EmptyDayCard
           dayLabel={dayLabel}
           dayName={dayName}
-          state="empty"
-          onAdd={canVote ? (note) => onAct(meal.id, "request_new_meal", note) : undefined}
+          state={awaitingMeal ? "awaiting" : "empty"}
+          onAdd={
+            awaitingMeal || !canVote
+              ? undefined
+              : (note) => onAct(meal.id, "request_new_meal", note)
+          }
         />
       );
     case "pending_add":

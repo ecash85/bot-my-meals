@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { WeekChromeView } from "@/components/week-chrome";
+import { WeekTitleRow } from "@/components/app-shell";
+import { EditNightsControl } from "@/components/edit-nights-control";
 import { botCheckForSnapshot } from "./bot-check";
 import {
   EDIT_NIGHTS_ADDED_TOAST,
@@ -154,30 +155,34 @@ describe("edit nights", () => {
     ).toEqual([]);
   });
 
-  it("puts Edit nights in the week chrome and points House defaults at that control", () => {
+  it("puts Edit nights on the week title row and points House defaults at that control", () => {
     const html = renderToStaticMarkup(
-      createElement(WeekChromeView, {
-        startsOn: "2026-09-27",
-        nights: [],
-        selectedMealId: null,
-        todayIso: "2026-09-28",
-        locked: false,
-        mutedDates: [],
-        showShoppingList: false,
-        firstMeal: null,
-        onSelect: () => undefined,
-        onStep: () => false,
-        planNext: null,
-        editNights: { onEdit: () => undefined },
+      createElement(WeekTitleRow, {
+        title: "Next week",
+        titleAside: createElement("span", { "data-slot": "week-locked-chip" }, "Locked"),
+        titleAction: createElement(EditNightsControl, { onEdit: () => undefined }),
       }),
     );
+    expect(html).toContain('data-slot="week-title-row"');
+    expect(html).toContain("justify-between");
     expect(html).toContain('data-slot="edit-nights"');
     expect(html).toContain(EDIT_NIGHTS_LABEL);
     expect(html).toContain("min-h-11");
     expect(html).toContain("min-w-11");
+    expect(html.indexOf("Next week")).toBeLessThan(html.indexOf("Locked"));
+    expect(html.indexOf("Locked")).toBeLessThan(html.indexOf(EDIT_NIGHTS_LABEL));
     expect(HOUSE_PEOPLE_DEFAULTS_NOTE).toBe(
       "Used when you start a new week. To change nights on This week or Next week, open that week and tap Edit nights.",
     );
+
+    const root = path.resolve(import.meta.dirname, "..");
+    const week = readFileSync(path.join(root, "app/week/page.tsx"), "utf8");
+    const chrome = readFileSync(path.join(root, "components/week-chrome.tsx"), "utf8");
+    expect(week).toContain("titleAction=");
+    expect(week).toContain("<EditNightsControl");
+    expect(week).toContain("showEditNightsEntry");
+    expect(chrome).not.toContain('data-slot="edit-nights"');
+    expect(chrome).not.toContain("EDIT_NIGHTS_LABEL");
   });
 
   it("checks portions against the week's plates after they are saved", () => {
@@ -196,6 +201,12 @@ describe("edit nights", () => {
       week: { status: "voting" as const, nightHeadcounts: [2, 2, 2, 2, 2, 0, 0] },
     };
     expect(botCheckForSnapshot(base).reason).toBe("idle");
+    expect(
+      botCheckForSnapshot({
+        ...base,
+        meals: [{ ...dinner, title: "" }],
+      }).reason,
+    ).toBe("meal_pending");
     expect(
       botCheckForSnapshot({
         ...base,

@@ -15,6 +15,34 @@ const TABS = [
   { href: "/settings", label: "House", icon: Settings2 },
 ];
 
+export function WeekTitleRow({
+  title,
+  titleAside,
+  titleAction,
+  className,
+}: {
+  title: string;
+  titleAside?: ReactNode;
+  titleAction?: ReactNode;
+  className?: string;
+}) {
+  if (!titleAside && !titleAction) {
+    return <h1 className={cn("type-title text-foreground", className)}>{title}</h1>;
+  }
+  return (
+    <div
+      data-slot="week-title-row"
+      className={cn("flex items-center justify-between gap-2", className)}
+    >
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        <h1 className="type-title text-foreground">{title}</h1>
+        {titleAside}
+      </div>
+      {titleAction ? <div className="shrink-0">{titleAction}</div> : null}
+    </div>
+  );
+}
+
 export function AppShell({
   title,
   eyebrow,
@@ -24,6 +52,7 @@ export function AppShell({
   chrome,
   status,
   titleAside,
+  titleAction,
   footer,
   hideNav = false,
   children,
@@ -37,6 +66,8 @@ export function AppShell({
   chrome?: ReactNode;
   status?: ReactNode;
   titleAside?: ReactNode;
+  /** Right side of the title row. Edit nights lives here, not on its own band. */
+  titleAction?: ReactNode;
   footer?: ReactNode;
   hideNav?: boolean;
   children: ReactNode;
@@ -81,19 +112,12 @@ export function AppShell({
               {eyebrow}
             </p>
           ) : null}
-          {titleAside ? (
-            <div
-              className={cn(
-                "flex flex-wrap items-center gap-x-2 gap-y-1",
-                !eyebrow && !backHref && "mt-2",
-              )}
-            >
-              <h1 className="type-title text-foreground">{title}</h1>
-              {titleAside}
-            </div>
-          ) : (
-            <h1 className={cn("type-title text-foreground", !eyebrow && !backHref && "mt-2")}>{title}</h1>
-          )}
+          <WeekTitleRow
+            title={title}
+            titleAside={titleAside}
+            titleAction={titleAction}
+            className={!eyebrow && !backHref ? "mt-2" : undefined}
+          />
         </header>
         {chrome ? <div data-slot="shell-chrome">{chrome}</div> : null}
         {status}

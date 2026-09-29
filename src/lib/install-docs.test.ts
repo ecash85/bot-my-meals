@@ -124,7 +124,8 @@ function expectPlanningPeopleGateInstallPaste(doc: string) {
 }
 
 function expectEditNightsInstallPaste(doc: string) {
-  expect(doc).toMatch(/week chrome has (?:\*\*)?Edit nights/);
+  expect(doc).toMatch(/title row has (?:\*\*)?Edit nights/);
+  expect(doc).toMatch(/same line as the week title, right-aligned/);
   expect(doc).toMatch(/week-scoped (?:\*\*)?People per night/);
   expect(doc).toMatch(/empty (?:\*\*)?Next week(?:\*\*)? gate/);
   expect(doc).toMatch(/re-open/);
@@ -143,6 +144,43 @@ function expectEditNightsInstallPaste(doc: string) {
   expect(doc).toMatch(/night_headcounts/);
   expect(doc).toMatch(/special_instructions/);
   expect(doc).toMatch(/week_id/);
+  expect(doc).not.toMatch(/grandma/i);
+}
+
+function expectTitleRowEditNightsWaitingFeedbackPaste(doc: string) {
+  expect(doc).toMatch(/title row has (?:\*\*)?Edit nights/);
+  expect(doc).toMatch(/same line as the week title, right-aligned/);
+  expect(doc).toMatch(/not a free-floating chrome chip below the title/);
+  expect(doc).toMatch(/Locked chip still hugs the title/);
+  expect(doc).toMatch(/flush under the title row \(0 gap\)/);
+  expect(doc).toMatch(
+    /Hidden when locked, past, or the empty People gate is already the body/,
+  );
+  expect(doc).toMatch(
+    /Used when you start a new week\. To change nights on This week or Next week, open that week and tap (?:\*\*)?Edit nights(?:\*\*)?\./,
+  );
+  expect(doc).toMatch(/does not rewrite House defaults/);
+  expect(doc).toMatch(/template for new weeks/);
+  expect(doc).toMatch(
+    /returns to that week with a (?:\*\*)?Waiting(?:\*\*)? card immediately/,
+  );
+  expect(doc).toMatch(/ballot, blank new night, portions, swap/);
+  expect(doc).toMatch(/Waiting for a meal/);
+  expect(doc).toMatch(/not [“"]No dinner[”"]/);
+  expect(doc).toMatch(/Checking…|Checking\u2026/);
+  expect(doc).toMatch(/Waking…|Waking\u2026/);
+  expect(doc).toMatch(/Your bot was notified/);
+  expect(doc).toMatch(/recipes-and-list line/);
+  expect(doc).toMatch(/[Ss]oft-fail re-enables the button/);
+  expect(doc).toMatch(/does not claim a wake/);
+  expect(doc).toMatch(/message the bot/);
+  expect(doc).toMatch(/~30s cooldown/);
+  expect(doc).toMatch(/Bot notified/);
+  expect(doc).toMatch(/another tap is a no-op/);
+  expect(doc).toMatch(/refetches briefly/);
+  expect(doc).toMatch(/Waiting leaves when content is ready/);
+  expect(doc).toMatch(/does not teach checks every hour|still omits hour \/ Adaptive \/ countdown/);
+  expect(doc).toMatch(/silent backend fallback/);
   expect(doc).not.toMatch(/grandma/i);
 }
 
@@ -185,6 +223,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectPlanningPeopleGateInstallPaste(readme);
     expectEditNightsInstallPaste(paste);
     expectEditNightsInstallPaste(readme);
+    expectTitleRowEditNightsWaitingFeedbackPaste(paste);
+    expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
     expectWebhookWaitingInstallPaste(readme);
 
@@ -259,6 +299,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectPlanningPeopleGateInstallPaste(paste);
     expectEditNightsInstallPaste(paste);
     expectEditNightsInstallPaste(readme);
+    expectTitleRowEditNightsWaitingFeedbackPaste(paste);
+    expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
 
     const setupAt = paste.indexOf("After Create household, walk through house setup");
@@ -307,6 +349,8 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectPlanningPeopleGateInstallPaste(readme);
     expectEditNightsInstallPaste(paste);
     expectEditNightsInstallPaste(readme);
+    expectTitleRowEditNightsWaitingFeedbackPaste(paste);
+    expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
     expectWebhookWaitingInstallPaste(readme);
     expectWakeInstallPaste(paste);
@@ -330,6 +374,8 @@ describe("Install docs — email + password + Wake on app event", () => {
 
     expectEditNightsInstallPaste(paste);
     expectEditNightsInstallPaste(readme);
+    expectTitleRowEditNightsWaitingFeedbackPaste(paste);
+    expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectPlanningPeopleGateInstallPaste(paste);
     expectPlanningPeopleGateInstallPaste(readme);
     expectDualWeekInstallPaste(paste);
@@ -340,6 +386,33 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(readme).toContain("20260929001000_week_scoped_edit_nights.sql");
     expect(paste).toMatch(/do not create a planning week during setup/);
     expect(readme).toMatch(/Install does not create a planning week/);
+  });
+
+  it("locks title-row Edit nights, immediate Waiting after Save, and Check now working-state feedback", () => {
+    const readme = readRepo("README.md");
+    const paste = grokPromptPaste(readme);
+
+    expectTitleRowEditNightsWaitingFeedbackPaste(paste);
+    expectTitleRowEditNightsWaitingFeedbackPaste(readme);
+    expectEditNightsInstallPaste(paste);
+    expectEditNightsInstallPaste(readme);
+    expectWebhookWaitingInstallPaste(paste);
+    expectWebhookWaitingInstallPaste(readme);
+    expectPlanningPeopleGateInstallPaste(paste);
+    expectDualWeekInstallPaste(paste);
+    expectPasswordInstallHappyPath(paste);
+    expectWakeInstallPaste(paste);
+
+    expect(paste).toMatch(/not a free-floating chrome chip below the title/);
+    expect(paste).toMatch(/Waiting for a meal/);
+    expect(paste).toMatch(/Checking…|Checking\u2026/);
+    expect(paste).toMatch(/Your bot was notified/);
+    expect(paste).toMatch(/~30s cooldown/);
+    expect(paste).toMatch(/does not claim a wake/);
+    expect(readme).toMatch(/not a free-floating chrome chip below the title/);
+    expect(readme).toMatch(/Waiting for a meal/);
+    expect(readme).toMatch(/does not claim a wake/);
+    expect(readme).not.toMatch(/grandma/i);
   });
 
   it("does not ship a monorepo apps/app README or marketing check-pages", () => {

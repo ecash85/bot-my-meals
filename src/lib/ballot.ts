@@ -1,4 +1,5 @@
-import type { NightLifecycle, VoteChoice } from "./types";
+import { latestVoteForMeal, migrateVoteChoice } from "./lock";
+import type { Meal, Membership, NightLifecycle, Vote, VoteChoice } from "./types";
 
 /** Brief §6 — swap sheet */
 export const SWAP_SHEET_TITLE = "Request a swap";
@@ -82,6 +83,18 @@ export function emptyWeekPresentation(input: {
 }
 
 export type WeekNightPresentation = "ballot" | "empty" | "pending_add" | "locked_empty";
+
+/** Blank dinner slot the bot still has to fill. A remove vote stays “No dinner”. */
+export function awaitingMealSlot(
+  meal: Pick<Meal, "id" | "title">,
+  votes: Vote[],
+  memberships?: Membership[],
+): boolean {
+  if (meal.title.trim()) return false;
+  const latest = latestVoteForMeal(votes, meal.id, memberships);
+  const choice = latest ? migrateVoteChoice(latest.choice) : null;
+  return choice !== "remove";
+}
 
 export function weekNightPresentation(
   lifecycle: NightLifecycle,

@@ -29,7 +29,76 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { mealCardControlId } from "@/lib/dates";
+import { AWAITING_MEAL_LABEL } from "@/lib/wake-feedback";
 import { cn } from "@/lib/utils";
+
+function renderEmptyDayBody({
+  state,
+  note,
+  onAdd,
+  onCancel,
+  openAdd,
+  cancelRequest,
+}: {
+  state: "empty" | "pending" | "locked" | "awaiting";
+  note?: string;
+  onAdd?: (note: string) => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
+  openAdd: () => void;
+  cancelRequest: () => void;
+}) {
+  switch (state) {
+    case "locked":
+      return <h2 className="type-section mt-1">{LOCKED_EMPTY_COPY}</h2>;
+    case "pending":
+      return (
+        <>
+          <h2 className="type-section mt-1">{PENDING_ADD_TITLE}</h2>
+          <p className="type-body mt-2 text-muted-foreground">{PENDING_ADD_HELPER}</p>
+          {note ? <p className="type-meta mt-2 text-muted-foreground">{note}</p> : null}
+          {onCancel ? (
+            <Button
+              type="button"
+              variant="link"
+              className="mt-3 h-auto min-h-12 px-0 text-base"
+              onClick={() => cancelRequest()}
+            >
+              {PENDING_ADD_CANCEL}
+            </Button>
+          ) : null}
+        </>
+      );
+    case "awaiting":
+      return (
+        <h2 data-slot="awaiting-meal" className="type-section mt-1 text-muted-foreground">
+          {AWAITING_MEAL_LABEL}
+        </h2>
+      );
+    case "empty":
+      return (
+        <>
+          <h2 className="type-section mt-1">{EMPTY_DAY_TITLE}</h2>
+          <p className="type-body mt-2 text-muted-foreground">{EMPTY_DAY_HELPER}</p>
+          {onAdd ? (
+            <Button
+              type="button"
+              size="fat"
+              variant="outline"
+              className="mt-4 w-full gap-2"
+              onClick={openAdd}
+            >
+              <Plus className="size-5" />
+              {EMPTY_DAY_ADD}
+            </Button>
+          ) : null}
+        </>
+      );
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
+  }
+}
 
 export function EmptyDayCard({
   dayLabel,
@@ -41,7 +110,7 @@ export function EmptyDayCard({
 }: {
   dayLabel: string;
   dayName: string;
-  state: "empty" | "pending" | "locked";
+  state: "empty" | "pending" | "locked" | "awaiting";
   note?: string;
   onAdd?: (note: string) => void | Promise<void>;
   onCancel?: () => void | Promise<void>;
@@ -85,42 +154,7 @@ export function EmptyDayCard({
       >
         {dayLabel}
       </p>
-      {state === "locked" ? (
-        <h2 className="type-section mt-1">{LOCKED_EMPTY_COPY}</h2>
-      ) : state === "pending" ? (
-        <>
-          <h2 className="type-section mt-1">{PENDING_ADD_TITLE}</h2>
-          <p className="type-body mt-2 text-muted-foreground">{PENDING_ADD_HELPER}</p>
-          {note ? <p className="type-meta mt-2 text-muted-foreground">{note}</p> : null}
-          {onCancel ? (
-            <Button
-              type="button"
-              variant="link"
-              className="mt-3 h-auto min-h-12 px-0 text-base"
-              onClick={() => cancelRequest()}
-            >
-              {PENDING_ADD_CANCEL}
-            </Button>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <h2 className="type-section mt-1">{EMPTY_DAY_TITLE}</h2>
-          <p className="type-body mt-2 text-muted-foreground">{EMPTY_DAY_HELPER}</p>
-          {onAdd ? (
-            <Button
-              type="button"
-              size="fat"
-              variant="outline"
-              className="mt-4 w-full gap-2"
-              onClick={() => setOpen(true)}
-            >
-              <Plus className="size-5" />
-              {EMPTY_DAY_ADD}
-            </Button>
-          ) : null}
-        </>
-      )}
+      {renderEmptyDayBody({ state, note, onAdd, onCancel, openAdd: () => setOpen(true), cancelRequest })}
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
