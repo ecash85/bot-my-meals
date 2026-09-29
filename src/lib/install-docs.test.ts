@@ -49,6 +49,22 @@ function expectWakeInstallPaste(paste: string) {
   expect(paste).toMatch(/Never NEXT_PUBLIC/);
   expect(paste).toMatch(/do not show the full secret again/i);
   expect(paste).toMatch(/fallback/);
+  expect(paste).toMatch(/do not create Adaptive/i);
+  expect(paste).toMatch(/Required for every household/);
+  expect(paste).toMatch(/not optional/);
+  expect(paste).toMatch(/setup is incomplete/);
+  expect(paste).toMatch(/Install must still create and save the webhook/);
+  expect(paste).toMatch(/7\) Create a routine named Wake on app event/);
+  expect(paste).toMatch(/Required before Create this week's meals/);
+  expect(paste).toMatch(/Do not tap Create this week's meals yet/);
+  expect(paste).toMatch(/Then walk house setup through Create this week's meals/);
+  const wakeStepAt = paste.indexOf("7) Create a routine named Wake on app event");
+  const createMealsAt = paste.indexOf("Tap Create this week's meals");
+  expect(wakeStepAt).toBeGreaterThan(-1);
+  expect(createMealsAt).toBeGreaterThan(wakeStepAt);
+  expect(paste).not.toMatch(/Polling stays the fallback/);
+  expect(paste).not.toMatch(/DIY alternative/);
+  expect(paste).not.toMatch(/does not require creating a Grok Bot/);
   expect(paste).not.toMatch(/Copy POST to and key/);
   expect(paste).not.toMatch(/NEXT_PUBLIC_BOT_WAKE/);
   expect(paste).not.toMatch(/grandma/i);
@@ -179,20 +195,36 @@ function expectTitleRowEditNightsWaitingFeedbackPaste(doc: string) {
   expect(doc).toMatch(/another tap is a no-op/);
   expect(doc).toMatch(/refetches briefly/);
   expect(doc).toMatch(/Waiting leaves when content is ready/);
-  expect(doc).toMatch(/does not teach checks every hour|still omits hour \/ Adaptive \/ countdown/);
-  expect(doc).toMatch(/silent backend fallback/);
+  expect(doc).toMatch(/do (?:\*\*)?not(?:\*\*)? create Adaptive/i);
+  expect(doc).not.toMatch(/silent backend fallback/);
+  expect(doc).not.toMatch(/Polling stays the fallback/);
+  expect(doc).not.toMatch(/Start that backend routine @every 1h/);
   expect(doc).not.toMatch(/grandma/i);
 }
 
 function expectWebhookWaitingInstallPaste(doc: string) {
   expect(doc).toMatch(/configured/);
-  expect(doc).toMatch(/does not teach checks every hour/);
-  expect(doc).toMatch(/Adaptive cadence/);
-  expect(doc).toMatch(/countdown-to-next-poll/);
   expect(doc).toMatch(/Your bot was notified/);
-  expect(doc).toMatch(/silent backend fallback/);
-  expect(doc).toMatch(/When Wake is unset/);
   expect(doc).toMatch(/Wake on app event/);
+  expect(doc).toMatch(/webhook trigger/);
+  expect(doc).toMatch(/message the Bot|message the bot/);
+  expect(doc).toMatch(/do (?:\*\*)?not(?:\*\*)? create Adaptive/i);
+  expect(doc).toMatch(/setup is incomplete/);
+  expect(doc).toMatch(/required for every household|Required for every household/);
+  expect(doc).toMatch(/not optional/);
+  expect(doc).toMatch(/before Create this week's meals/);
+  expect(doc).toMatch(/before first ballot|first ballot/);
+  expect(doc).not.toMatch(/silent backend fallback/);
+  expect(doc).not.toMatch(/When Wake is unset/);
+  expect(doc).not.toMatch(/Polling stays the fallback/);
+  expect(doc).not.toMatch(/Ask your Grok Bot \(optional\)/);
+  expect(doc).not.toMatch(/does \*\*not\*\* require creating a Grok Bot/);
+  expect(doc).not.toMatch(/DIY alternative/);
+  expect(doc).not.toMatch(/cadence\.mode/);
+  expect(doc).not.toMatch(/House → Bot check frequency/);
+  expect(doc).not.toMatch(/Start that backend routine @every 1h/);
+  expect(doc).not.toMatch(/Adaptive cadence/);
+  expect(doc).not.toMatch(/countdown-to-next-poll/);
   expect(doc).not.toMatch(/While waiting, the page says how often the Bot checks/);
   expect(doc).not.toMatch(/While you(?:'|’)re waiting, the page says how often the Bot checks/);
   expect(doc).not.toMatch(
@@ -200,7 +232,7 @@ function expectWebhookWaitingInstallPaste(doc: string) {
   );
   for (const para of doc.split(/\n+/)) {
     if (!/@every 1h/.test(para)) continue;
-    expect(para).toMatch(/silent backend fallback|configured|webhook|Wake/);
+    expect(para).toMatch(/do (?:\*\*)?not(?:\*\*)? create Adaptive/i);
   }
   expect(doc).not.toMatch(/grandma/i);
 }
@@ -291,9 +323,20 @@ describe("Install docs — email + password + Wake on app event", () => {
     expect(paste).not.toMatch(/no store cart-add claims/);
 
     expect(readme).toMatch(/Wake on app event/);
+    expect(readme).toMatch(/### 9\. Wake on app event \(required before first ballot\)/);
+    expect(readme).toMatch(/### 10\. Add the other adult/);
+    expect(readme).toMatch(/Do \*\*not\*\* tap \*\*Create this week's meals\*\* yet/);
+    const setupSection = readme.slice(readme.indexOf("## Setup"));
+    expect(setupSection.indexOf("### 9. Wake on app event")).toBeLessThan(
+      setupSection.indexOf("Tap **Create this week's meals**"),
+    );
     expect(readme).toMatch(/Webhook URL/);
     expect(readme).toMatch(/House → Wake your Bot/);
     expect(readme).toMatch(/BOT_WAKE_WEBHOOK_URL/);
+    expect(readme).toMatch(/required for every household|Required for every household/);
+    expect(readme).toMatch(/setup is incomplete/);
+    expect(readme).not.toMatch(/Ask your Grok Bot \(optional\)/);
+    expect(readme).not.toMatch(/does \*\*not\*\* require creating a Grok Bot/);
     expect(readme).not.toMatch(/grandma/i);
 
     expect(routines).toMatch(/Wake on app event/);
@@ -338,10 +381,12 @@ describe("Install docs — email + password + Wake on app event", () => {
     expectTitleRowEditNightsWaitingFeedbackPaste(readme);
     expectWebhookWaitingInstallPaste(paste);
 
-    const setupAt = paste.indexOf("After Create household, walk through house setup");
+    const wakeAt = paste.indexOf("create Wake on app event and paste Webhook URL");
+    const setupAt = paste.indexOf("walk through house setup");
     const firstBallotAt = paste.indexOf("Tap Create this week's meals");
     const dualWeekAt = paste.indexOf("After the first ballot is live");
-    expect(setupAt).toBeGreaterThan(-1);
+    expect(wakeAt).toBeGreaterThan(-1);
+    expect(setupAt).toBeGreaterThan(wakeAt);
     expect(firstBallotAt).toBeGreaterThan(setupAt);
     expect(dualWeekAt).toBeGreaterThan(firstBallotAt);
 
