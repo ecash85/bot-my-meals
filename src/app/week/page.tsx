@@ -39,7 +39,7 @@ import {
 } from "@/lib/ballot";
 import { botCheckForHousehold, botCheckForSnapshot } from "@/lib/bot-check";
 import { FINISH_WAKE_BEFORE_CREATE } from "@/lib/bot-wake";
-import { mealCookPlan } from "@/lib/cook-timing";
+import { mealCookPlan, prepNoticesForHousehold } from "@/lib/cook-timing";
 import { formatMealCardDayLabel, weekdayLabelFromNight } from "@/lib/dates";
 import { PAST_WEEKS_LABEL, todayInTimeZone } from "@/lib/meal-history";
 import {
@@ -211,6 +211,7 @@ function WeekBallot() {
       .map((meal) => meal.id),
   );
   const nightDates = new Set(nights.map((meal) => meal.nightDate));
+  const viewedMealIds = new Set(nights.map((meal) => meal.id));
   const cookPlans = nights.map((meal) => ({
     meal,
     plan: mealCookPlan({
@@ -220,10 +221,10 @@ function WeekBallot() {
       dinnerTime: snapshot.household.dinnerTime,
     }),
   }));
-  const prepNotices = cookPlans.flatMap(({ meal, plan }) =>
-    removedMealIds.has(meal.id) ? [] : plan.notices,
+  const prepNotices = prepNoticesForHousehold(snapshot);
+  const leadingPrep = prepNotices.filter(
+    (notice) => viewedMealIds.has(notice.mealId) && !nightDates.has(notice.showOn),
   );
-  const leadingPrep = prepNotices.filter((notice) => !nightDates.has(notice.showOn));
   const planFor = (mealId: string) => cookPlans.find((item) => item.meal.id === mealId)?.plan;
   const dinner = scope ? upcomingDinner(scope.meals, scope.votes, todayIso) : undefined;
   const firstMeal =
@@ -360,7 +361,7 @@ function WeekBallot() {
     >
       <InstallPrompt />
       {viewingPast && past ? (
-        <PastWeekDetail week={past} />
+        <PastWeekDetail week={past} notices={prepNotices} />
       ) : showPeopleGate && scope ? (
         <PlanningPeopleGate
           household={snapshot.household}

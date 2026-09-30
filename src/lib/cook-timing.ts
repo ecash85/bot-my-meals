@@ -1,6 +1,7 @@
-import { addDays, WEEKDAY_LABELS } from "./dates";
+import { addDays, WEEKDAY_LABELS, WEEKDAY_SHORT } from "./dates";
 import { formatDuration } from "./duration";
-import type { AheadStep, Meal, Recipe } from "./types";
+import { isNightOff } from "./lock";
+import type { AheadStep, Meal, Membership, Recipe, Vote } from "./types";
 
 /**
  * Local serve time when `households.dinner_time` is missing.
@@ -15,6 +16,20 @@ const FALLBACK_TIME_ZONE = "America/Los_Angeles";
 
 /** Overnight with no explicit hour count. Lands on the previous evening for a 6 PM dinner. */
 const DEFAULT_OVERNIGHT_LEAD_MINUTES = 18 * 60;
+
+/** Fridge thaw when the recipe says thaw or frozen and gives no number. */
+export const STEAK_THAW_MINUTES = 36 * 60;
+export const LARGE_CUT_THAW_MINUTES = 48 * 60;
+export const BRISKET_THAW_MINUTES = 72 * 60;
+
+const STEAK_CUT =
+  /\b(ribeye|rib eye|ny strip|new york strip|strip steak|filet|fillet|sirloin|t-bone|porterhouse|flank|skirt|hanger|tri-?tip|steak)\b/i;
+const LARGE_CUT =
+  /\b(pork shoulder|pork butt|boston butt|pulled pork|prime rib|rib roast|chuck roast|pot roast|beef roast|pork roast|leg of lamb|short ribs?)\b/i;
+const MEAT_CUT = new RegExp(`${STEAK_CUT.source}|${LARGE_CUT.source}|\\bbrisket\\b`, "i");
+/** Frozen food that actually needs a fridge thaw. Peas and other sides stay out. */
+const FROZEN_PROTEIN =
+  /\b(beef|pork|lamb|chicken|turkey|duck|fish|salmon|shrimp|venison|bison|roast|ribs?)\b/i;
 
 const SMOKE_HINT =
   /\b(smoker|pellet grill|on the smoker|pork shoulder|pulled pork|boston butt|brisket|short ribs?)\b|\bsmoke\b/i;
@@ -50,7 +65,7 @@ export type CookPlanInput = {
 };
 
 export function mealCookPlan(input: CookPlanInput): CookPlan {
-  const durations = resolvedDurations(input.recipe, input.meal.prepMinutes);
+  const durations = resolvedDurations(input.recipe, input.meal.prepMinutes, input.meal.title);
   const total = durations.prepMinutes + durations.cookMinutes + durations.restMinutes;
   if (total <= 0 && durations.aheadSteps.length === 0) {
     return emptyPlan(durations);
@@ -90,6 +105,7 @@ function aheadLine(steps: AheadStep[]): string | null {
 export function resolvedDurations(
   recipe: CookPlanInput["recipe"],
   mealPrepMinutes: number,
+  title = "",
 ): {
   prepMinutes: number;
   cookMinutes: number;
@@ -97,11 +113,12 @@ export function resolvedDurations(
   aheadSteps: AheadStep[];
 } {
   if (!recipe) {
+    const prepMinutes = nonNegative(mealPrepMinutes);
     return {
-      prepMinutes: nonNegative(mealPrepMinutes),
+      prepMinutes,
       cookMinutes: 0,
       restMinutes: 0,
-      aheadSteps: [],
+      aheadSteps: inferredThawSteps({ title, steps: [], cookMinutes: 0, restMinutes: 0 }),
     };
   }
 
@@ -118,10 +135,72 @@ export function resolvedDurations(
     typeof recipe.restMinutes === "number" && recipe.restMinutes >= 0
       ? Math.round(recipe.restMinutes)
       : (parseRestMinutes(recipe.steps ?? []) ?? 0);
+  const steps = recipe.steps ?? [];
   const aheadSteps =
-    recipe.aheadSteps == null ? parseAheadFromSteps(recipe.steps ?? []) : recipe.aheadSteps;
+    recipe.aheadSteps == null
+      ? [
+          ...parseAheadFromSteps(steps),
+          ...inferredThawSteps({ title, steps, cookMinutes, restMinutes }),
+        ]
+      : recipe.aheadSteps;
 
   return { prepMinutes, cookMinutes, restMinutes, aheadSteps };
+}
+
+/** Notices for every open week, so a thaw can sit on an earlier day than the dinner. */
+export function collectPrepNotices(input: {
+  weeks: Array<{
+    meals: CookPlanInput["meal"][];
+    recipes: Array<CookPlanInput["recipe"] & { mealId: string }>;
+    votes: Vote[];
+  }>;
+  memberships?: Membership[];
+  timeZone: string;
+  dinnerTime?: string | null;
+}): PrepNotice[] {
+  return input.weeks.flatMap((week) =>
+    week.meals.flatMap((meal) => {
+      if (isNightOff(meal.id, week.votes, input.memberships)) return [];
+      return mealCookPlan({
+        meal,
+        recipe: week.recipes.find((recipe) => recipe.mealId === meal.id),
+        timeZone: input.timeZone,
+        dinnerTime: input.dinnerTime,
+      }).notices;
+    }),
+  );
+}
+
+/** Cooking week plus the open planning week, when that week exists. */
+export function prepNoticesForHousehold(snapshot: {
+  meals: CookPlanInput["meal"][];
+  recipes: Array<CookPlanInput["recipe"] & { mealId: string }>;
+  votes: Vote[];
+  planning?: {
+    meals: CookPlanInput["meal"][];
+    recipes: Array<CookPlanInput["recipe"] & { mealId: string }>;
+    votes: Vote[];
+  } | null;
+  memberships?: Membership[];
+  household: { timezone: string; dinnerTime?: string | null };
+}): PrepNotice[] {
+  return collectPrepNotices({
+    weeks: [
+      { meals: snapshot.meals, recipes: snapshot.recipes, votes: snapshot.votes },
+      ...(snapshot.planning
+        ? [
+            {
+              meals: snapshot.planning.meals,
+              recipes: snapshot.planning.recipes,
+              votes: snapshot.planning.votes,
+            },
+          ]
+        : []),
+    ],
+    memberships: snapshot.memberships,
+    timeZone: snapshot.household.timezone,
+    dinnerTime: snapshot.household.dinnerTime,
+  });
 }
 
 export function resolveDinnerTime(value: string | null | undefined): string {
@@ -222,15 +301,23 @@ function prepNotices(input: {
     if (showOn !== input.nightDate) bucketFor(showOn).start = input.start;
   }
 
+  const thawNotices: PrepNotice[] = [];
   for (const step of input.aheadSteps) {
     const when = new Date(input.dinner.getTime() - step.leadMinutes * 60_000);
-    const showOn = surfaceDate(when, input.timeZone);
+    const showOn = aheadSurfaceDate(when, input.timeZone, step.leadMinutes);
     if (showOn === input.nightDate) continue;
+    if (isThawLabel(step.label)) {
+      const text = thawNoticeText(input.title, input.nightDate);
+      if (!thawNotices.some((notice) => notice.showOn === showOn && notice.text === text)) {
+        thawNotices.push({ mealId: input.mealId, showOn, text });
+      }
+      continue;
+    }
     const bucket = bucketFor(showOn);
     if (!bucket.labels.includes(step.label)) bucket.labels.push(step.label);
   }
 
-  return [...buckets.entries()].flatMap(([showOn, bucket]) => {
+  const other = [...buckets.entries()].flatMap(([showOn, bucket]) => {
     const text = noticeText({
       showOn,
       dinnerDate: input.nightDate,
@@ -243,6 +330,7 @@ function prepNotices(input: {
     if (!text) return [];
     return [{ mealId: input.mealId, showOn, text }];
   });
+  return [...thawNotices, ...other];
 }
 
 function noticeText(input: {
@@ -276,6 +364,26 @@ function surfaceDate(when: Date, timeZone: string): string {
   return date;
 }
 
+/** A lead of a day or more stays on the calendar day it starts. Shorter leads still move before 9 AM to the previous evening. */
+function aheadSurfaceDate(when: Date, timeZone: string, leadMinutes: number): string {
+  if (leadMinutes >= 24 * 60) return zonedIsoDate(when, timeZone);
+  return surfaceDate(when, timeZone);
+}
+
+function thawNoticeText(title: string, dinnerDate: string): string {
+  const day = WEEKDAY_SHORT[weekdayIndex(dinnerDate)];
+  return `Pull ${thawSubject(title)} from freezer to thaw in fridge for ${day} dinner`;
+}
+
+function thawSubject(title: string): string {
+  const stripped = title.replace(/^\s*(freezer|frozen)\s+/i, "").trim();
+  return sentenceTitle(stripped || title);
+}
+
+function isThawLabel(label: string): boolean {
+  return /\b(thaw|frozen|freezer)\b/i.test(label);
+}
+
 function mentionsSmoker(title: string, steps: string[]): boolean {
   return SMOKE_HINT.test(`${title}\n${steps.join("\n")}`);
 }
@@ -303,6 +411,9 @@ function parseRestMinutes(steps: string[]): number | null {
 function parseCookMinutes(steps: string[]): number | null {
   let best: number | null = null;
   for (const step of steps) {
+    if (isThawText(step) && !/\b(smoke|smoker|roast|braise|cook|simmer|bake|grill|oven)\b/i.test(step)) {
+      continue;
+    }
     if (/\brest\b/i.test(step) && !/\b(smoke|roast|braise|cook|simmer|bake)\b/i.test(step)) continue;
     const minutes = minutesFromPhrase(step);
     if (minutes == null || minutes < 60) continue;
@@ -321,14 +432,57 @@ function parseAheadFromSteps(steps: string[]): AheadStep[] {
   const found: AheadStep[] = [];
   for (const step of steps) {
     if (!isAheadStep(step)) continue;
-    const label = aheadLabel(step);
+    const label = aheadLabel(step)
+      ?.replace(/(^|\s\+\s)thaw(?=\s\+\s|$)/g, "")
+      .replace(/^\s*\+\s*|\s*\+\s*$/g, "")
+      .trim();
     if (!label) continue;
-    const explicit = minutesFromPhrase(step);
+    const explicit = isThawText(step) ? null : minutesFromPhrase(step);
     const leadMinutes =
       explicit != null && explicit >= 60 ? explicit : DEFAULT_OVERNIGHT_LEAD_MINUTES;
     if (!found.some((item) => item.label === label)) found.push({ label, leadMinutes });
   }
   return found;
+}
+
+function inferredThawSteps(input: {
+  title: string;
+  steps: string[];
+  cookMinutes: number;
+  restMinutes: number;
+}): AheadStep[] {
+  const blob = `${input.title}\n${input.steps.join("\n")}`;
+  if (!isThawText(blob)) return [];
+  const thawLines = input.steps.filter(isThawText);
+
+  let explicit: number | null = null;
+  for (const step of thawLines) {
+    const minutes = minutesFromPhrase(step);
+    if (minutes != null && minutes >= 60 && (explicit == null || minutes > explicit)) explicit = minutes;
+  }
+  const thawMinutes = explicit ?? fridgeThawMinutes(input.title, input.steps);
+  return [
+    {
+      label: "thaw",
+      leadMinutes: thawMinutes + nonNegative(input.cookMinutes) + nonNegative(input.restMinutes),
+    },
+  ];
+}
+
+/** Steaks 36h, large roasts and pork butt 48h, brisket 72h. Unknown frozen meat uses the steak window. */
+export function fridgeThawMinutes(title: string, steps: readonly string[]): number {
+  const blob = `${title}\n${steps.join("\n")}`;
+  if (/\bbrisket\b/i.test(blob)) return BRISKET_THAW_MINUTES;
+  if (LARGE_CUT.test(blob)) return LARGE_CUT_THAW_MINUTES;
+  if (STEAK_CUT.test(blob)) return STEAK_THAW_MINUTES;
+  return STEAK_THAW_MINUTES;
+}
+
+function isThawText(text: string): boolean {
+  if (/\bthaw/i.test(text)) return true;
+  if (/\bfreezer\b/i.test(text)) return true;
+  if (/\bfrozen\b/i.test(text) && (MEAT_CUT.test(text) || FROZEN_PROTEIN.test(text))) return true;
+  return false;
 }
 
 function isAheadStep(step: string): boolean {
@@ -353,16 +507,17 @@ function aheadLabel(step: string): string | null {
 
 function minutesFromPhrase(text: string): number | null {
   const range = text.match(
-    /(\d+(?:\.\d+)?)\s*(?:–|-|to)\s*(\d+(?:\.\d+)?)\s*(hours|hrs|hr|minutes|mins|min)\b/i,
+    /(\d+(?:\.\d+)?)\s*(?:–|-|to)\s*(\d+(?:\.\d+)?)\s*(days|hours|hrs|hr|minutes|mins|min)\b/i,
   );
   if (range) return toMinutes(Number(range[2]), range[3] ?? "");
-  const one = text.match(/(\d+(?:\.\d+)?)\s*(hours|hrs|hr|minutes|mins|min)\b/i);
+  const one = text.match(/(\d+(?:\.\d+)?)\s*(days|hours|hrs|hr|minutes|mins|min)\b/i);
   if (!one) return null;
   return toMinutes(Number(one[1]), one[2] ?? "");
 }
 
 function toMinutes(amount: number, unit: string): number | null {
   if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (/day/i.test(unit)) return Math.round(amount * 24 * 60);
   return /hour|hr/i.test(unit) ? Math.round(amount * 60) : Math.round(amount);
 }
 
