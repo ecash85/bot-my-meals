@@ -6,17 +6,26 @@ import { describe, expect, it } from "vitest";
 import { AheadPrepNotice } from "@/components/ahead-prep";
 import { BallotCard } from "@/components/ballot-card";
 import { RecipeBlock } from "@/components/recipe-view";
+import { PastWeekDetail } from "@/components/past-weeks";
 import {
   DEFAULT_DINNER_TIME,
+  collectPrepNotices,
+  fridgeThawMinutes,
   mealCookPlan,
   parseAheadStepsColumn,
   resolveDinnerTime,
+  resolvedDurations,
 } from "./cook-timing";
-import type { Recipe } from "./types";
+import type { Recipe, Vote } from "./types";
 
 const ZONE = "America/New_York";
 const SATURDAY = "2026-10-03";
 const FRIDAY = "2026-10-02";
+const THURSDAY = "2026-10-01";
+const WEDNESDAY = "2026-09-30";
+const TUESDAY = "2026-09-29";
+const MONDAY = "2026-09-28";
+const SUNDAY = "2026-10-04";
 
 function meal(partial: { id?: string; title?: string; nightDate?: string; prepMinutes?: number } = {}) {
   return {
@@ -181,6 +190,267 @@ describe("mealCookPlan", () => {
     expect(plan.notices).toEqual([]);
   });
 
+  it("pulls a freezer ribeye on Thursday for Friday dinner", () => {
+    const plan = mealCookPlan({
+      meal: meal({ id: "ribeye", title: "Freezer ribeye", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "ribeye",
+        prepMinutes: 15,
+        cookMinutes: 20,
+        restMinutes: 5,
+        aheadSteps: null,
+        steps: ["Thaw in the fridge.", "Sear the steak."],
+      }),
+      timeZone: ZONE,
+    });
+
+    expect(fridgeThawMinutes("Freezer ribeye", [])).toBe(36 * 60);
+    expect(plan.notices).toEqual([
+      {
+        mealId: "ribeye",
+        showOn: THURSDAY,
+        text: "Pull ribeye from freezer to thaw in fridge for Fri dinner",
+      },
+    ]);
+    expect(resolvedDurations(
+      recipe({
+        prepMinutes: 0,
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Thaw overnight."],
+      }),
+      0,
+      "Ribeye",
+    ).aheadSteps).toEqual([{ label: "thaw", leadMinutes: 36 * 60 }]);
+  });
+
+  it("uses two to three days for a large roast or brisket, and a written hour count wins", () => {
+    const roast = mealCookPlan({
+      meal: meal({ id: "butt", title: "Pork butt", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "butt",
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Move it from the freezer to the fridge."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(roast.notices[0]).toMatchObject({
+      showOn: WEDNESDAY,
+      text: "Pull pork butt from freezer to thaw in fridge for Fri dinner",
+    });
+
+    const brisket = mealCookPlan({
+      meal: meal({ id: "brisket", title: "Frozen brisket", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "brisket",
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Season once it is thawed."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(brisket.notices[0]?.showOn).toBe(TUESDAY);
+    expect(brisket.notices[0]?.text).toBe(
+      "Pull brisket from freezer to thaw in fridge for Fri dinner",
+    );
+
+    const longSmoke = mealCookPlan({
+      meal: meal({ id: "brisket", title: "Brisket", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "brisket",
+        cookMinutes: 22 * 60,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Thaw in the fridge.", "Smoke until 203°F."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(longSmoke.notices.find((notice) => notice.text.startsWith("Pull"))?.showOn).toBe(MONDAY);
+
+    const counted = mealCookPlan({
+      meal: meal({ id: "ribeye", title: "Ribeye", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "ribeye",
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Thaw for 48 hours.", "Sear."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(counted.cookMinutes).toBe(0);
+    expect(counted.notices[0]?.showOn).toBe(WEDNESDAY);
+
+    const ranged = resolvedDurations(
+      recipe({
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: null,
+        steps: ["Thaw 24 to 48 hours."],
+      }),
+      0,
+      "Ribeye",
+    );
+    expect(ranged.aheadSteps).toEqual([{ label: "thaw", leadMinutes: 48 * 60 }]);
+  });
+
+  it("keeps an explicit thaw lead and ignores frozen food that is not meat", () => {
+    const explicit = mealCookPlan({
+      meal: meal({ id: "ribeye", title: "Freezer ribeye", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "ribeye",
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: [{ label: "thaw", leadMinutes: 18 * 60 }],
+        steps: ["Thaw overnight."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(explicit.notices[0]?.showOn).toBe(THURSDAY);
+    expect(
+      resolvedDurations(
+        recipe({
+          cookMinutes: 0,
+          restMinutes: 0,
+          aheadSteps: [{ label: "thaw", leadMinutes: 18 * 60 }],
+          steps: ["Thaw overnight."],
+        }),
+        0,
+        "Freezer ribeye",
+      ).aheadSteps[0]?.leadMinutes,
+    ).toBe(18 * 60);
+
+    const peas = mealCookPlan({
+      meal: meal({ id: "peas", title: "Frozen peas", nightDate: FRIDAY, prepMinutes: 10 }),
+      recipe: recipe({
+        mealId: "peas",
+        prepMinutes: 10,
+        cookMinutes: 0,
+        restMinutes: null,
+        aheadSteps: null,
+        steps: ["Heat the frozen peas."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(peas.notices).toEqual([]);
+    expect(peas.aheadLine).toBeNull();
+
+    const decided = mealCookPlan({
+      meal: meal({ id: "ribeye", title: "Freezer ribeye", nightDate: FRIDAY }),
+      recipe: recipe({
+        mealId: "ribeye",
+        cookMinutes: 15,
+        aheadSteps: [],
+        steps: ["Thaw in the fridge."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(decided.notices).toEqual([]);
+  });
+
+  it("shows a Sunday thaw on the previous week's Friday", () => {
+    const notices = collectPrepNotices({
+      weeks: [
+        {
+          meals: [meal({ id: "butt", title: "Pork butt", nightDate: SUNDAY })],
+          recipes: [
+            recipe({
+              mealId: "butt",
+              cookMinutes: 0,
+              restMinutes: 0,
+              aheadSteps: null,
+              steps: ["Thaw in the fridge."],
+            }),
+          ],
+          votes: [],
+        },
+      ],
+      timeZone: ZONE,
+      dinnerTime: DEFAULT_DINNER_TIME,
+    });
+    expect(notices).toEqual([
+      {
+        mealId: "butt",
+        showOn: FRIDAY,
+        text: "Pull pork butt from freezer to thaw in fridge for Sun dinner",
+      },
+    ]);
+
+    const removed = collectPrepNotices({
+      weeks: [
+        {
+          meals: [meal({ id: "butt", title: "Pork butt", nightDate: SUNDAY })],
+          recipes: [
+            recipe({
+              mealId: "butt",
+              cookMinutes: 0,
+              restMinutes: 0,
+              aheadSteps: null,
+              steps: ["Thaw in the fridge."],
+            }),
+          ],
+          votes: [
+            {
+              id: "vote",
+              householdId: "house",
+              mealId: "butt",
+              membershipId: "member",
+              choice: "remove",
+              note: "",
+              updatedAt: "2026-09-29T00:00:00.000Z",
+            } satisfies Vote,
+          ],
+        },
+      ],
+      timeZone: ZONE,
+    });
+    expect(removed).toEqual([]);
+
+    const past = renderToStaticMarkup(
+      createElement(PastWeekDetail, {
+        week: {
+          startsOn: "2026-09-27",
+          nights: [{ nightDate: FRIDAY, title: "Tacos", plates: 4 }],
+        },
+        notices,
+      }),
+    );
+    expect(past).toContain("Pull pork butt from freezer to thaw in fridge for Sun dinner");
+    expect(past).toContain('data-slot="past-week-night"');
+
+    const loose = renderToStaticMarkup(
+      createElement(PastWeekDetail, {
+        week: { startsOn: "2026-09-27", nights: [{ nightDate: FRIDAY, title: "Tacos", plates: 4 }] },
+        notices: [{ mealId: "ribeye", showOn: WEDNESDAY, text: "Pull ribeye from freezer to thaw in fridge for Fri dinner" }],
+      }),
+    );
+    expect(loose).toContain("Pull ribeye from freezer to thaw in fridge for Fri dinner");
+  });
+
+  it("places a multi-day dry brine on the day it starts", () => {
+    const plan = mealCookPlan({
+      meal: meal({ title: "Roast chicken", nightDate: SUNDAY }),
+      recipe: recipe({
+        cookMinutes: 0,
+        restMinutes: 0,
+        aheadSteps: [{ label: "dry brine", leadMinutes: 48 * 60 }],
+        steps: ["Roast until the thigh hits 165°F."],
+      }),
+      timeZone: ZONE,
+    });
+    expect(plan.notices).toEqual([
+      {
+        mealId: "shoulder",
+        showOn: FRIDAY,
+        text: "Tonight: prep for Sunday's roast chicken, dry brine",
+      },
+    ]);
+  });
+
   it("falls back to 6:00 PM and accepts a Postgres time", () => {
     expect(resolveDinnerTime(null)).toBe("18:00");
     expect(resolveDinnerTime("18:00:00")).toBe("18:00");
@@ -237,9 +507,17 @@ describe("cook timing surfaces", () => {
       path.join(root, "supabase/migrations/20260929235000_cook_timing.sql"),
       "utf8",
     );
+    const recipes = readFileSync(path.join(root, "src/app/recipes/page.tsx"), "utf8");
+    const paste = readFileSync(path.join(root, "src/lib/house-setup.ts"), "utf8");
     expect(week).toContain("AheadPrepNotice");
     expect(week).toContain("startBy=");
+    expect(week).toContain("prepNoticesForHousehold");
+    expect(recipes).toContain("prepNoticesForHousehold");
     expect(docs).toMatch(/ahead_steps/);
+    expect(docs).toMatch(/36 hours for a steak/);
+    expect(docs).toMatch(/48 hours for a large roast or pork butt/);
+    expect(docs).toMatch(/72 hours for a brisket/);
+    expect(paste).toMatch(/36 hours for a steak/);
     expect(docs).toMatch(/dinner_time/);
     expect(sql).toMatch(/rest_minutes/);
     expect(sql).toMatch(/ahead_steps/);

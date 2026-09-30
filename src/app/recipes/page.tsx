@@ -10,7 +10,7 @@ import { StatusStrip } from "@/components/status-strip";
 import { useSupper } from "@/components/supper-provider";
 import { useViewedWeek } from "@/components/use-viewed-week";
 import { EMPTY_DAY_TITLE } from "@/lib/ballot";
-import { mealCookPlan } from "@/lib/cook-timing";
+import { mealCookPlan, prepNoticesForHousehold } from "@/lib/cook-timing";
 import { formatWeekEyebrow, formatWeekRange, weekdayShortFromNight } from "@/lib/dates";
 import { todayInTimeZone } from "@/lib/meal-history";
 import { isNightOff } from "@/lib/lock";
@@ -53,7 +53,7 @@ function RecipesBody() {
         backHref="/week"
         backLabel={formatWeekRange(past.startsOn)}
       >
-        <PastWeekDetail week={past} />
+        <PastWeekDetail week={past} notices={prepNoticesForHousehold(snapshot)} />
       </AppShell>
     );
   }
