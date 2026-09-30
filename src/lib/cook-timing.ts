@@ -17,20 +17,17 @@ const FALLBACK_TIME_ZONE = "America/Los_Angeles";
 /** Overnight with no explicit hour count. Lands on the previous evening for a 6 PM dinner. */
 const DEFAULT_OVERNIGHT_LEAD_MINUTES = 18 * 60;
 
-/** Fridge thaw when the recipe says thaw or frozen and gives no number. */
+/** Fridge thaw when the recipe says thaw or frozen and gives no real thaw span. */
 export const STEAK_THAW_MINUTES = 36 * 60;
+/** A bare number shorter than this is not a fridge thaw. Salt and rest times live under it. */
+const MIN_BARE_THAW_MINUTES = 6 * 60;
 export const LARGE_CUT_THAW_MINUTES = 48 * 60;
 export const BRISKET_THAW_MINUTES = 72 * 60;
 
 const STEAK_CUT =
-  /\b(ribeye|rib eye|ny strip|new york strip|strip steak|filet|fillet|sirloin|t-bone|porterhouse|flank|skirt|hanger|tri-?tip|steak)\b/i;
+  /\b(ribeye|rib eye|picanha|ny strip|new york strip|strip steak|filet|fillet|sirloin|t-bone|porterhouse|flank|skirt|hanger|tri-?tip|flat iron|bavette|steak)\b/i;
 const LARGE_CUT =
   /\b(pork shoulder|pork butt|boston butt|pulled pork|prime rib|rib roast|chuck roast|pot roast|beef roast|pork roast|leg of lamb|short ribs?)\b/i;
-const MEAT_CUT = new RegExp(`${STEAK_CUT.source}|${LARGE_CUT.source}|\\bbrisket\\b`, "i");
-/** Frozen food that actually needs a fridge thaw. Peas and other sides stay out. */
-const FROZEN_PROTEIN =
-  /\b(beef|pork|lamb|chicken|turkey|duck|fish|salmon|shrimp|venison|bison|roast|ribs?)\b/i;
-
 const SMOKE_HINT =
   /\b(smoker|pellet grill|on the smoker|pork shoulder|pulled pork|boston butt|brisket|short ribs?)\b|\bsmoke\b/i;
 
@@ -302,19 +299,30 @@ function prepNotices(input: {
   }
 
   const thawNotices: PrepNotice[] = [];
+  const pushThaw = (showOn: string, text: string) => {
+    if (showOn === input.nightDate) return;
+    if (!thawNotices.some((notice) => notice.showOn === showOn && notice.text === text)) {
+      thawNotices.push({ mealId: input.mealId, showOn, text });
+    }
+  };
   for (const step of input.aheadSteps) {
     const when = new Date(input.dinner.getTime() - step.leadMinutes * 60_000);
-    const showOn = aheadSurfaceDate(when, input.timeZone, step.leadMinutes);
-    if (showOn === input.nightDate) continue;
+    const showOnDates = aheadShowDates(when, input.timeZone, step.leadMinutes);
     if (isThawLabel(step.label)) {
-      const text = thawNoticeText(input.title, input.nightDate);
-      if (!thawNotices.some((notice) => notice.showOn === showOn && notice.text === text)) {
-        thawNotices.push({ mealId: input.mealId, showOn, text });
+      const pull = thawNoticeText(input.title, input.nightDate);
+      const startDay = zonedIsoDate(when, input.timeZone);
+      for (const showOn of showOnDates) {
+        const text =
+          showOn === startDay ? pull : `Tonight: ${pull.charAt(0).toLowerCase()}${pull.slice(1)}`;
+        pushThaw(showOn, text);
       }
       continue;
     }
-    const bucket = bucketFor(showOn);
-    if (!bucket.labels.includes(step.label)) bucket.labels.push(step.label);
+    for (const showOn of showOnDates) {
+      if (showOn === input.nightDate) continue;
+      const bucket = bucketFor(showOn);
+      if (!bucket.labels.includes(step.label)) bucket.labels.push(step.label);
+    }
   }
 
   const other = [...buckets.entries()].flatMap(([showOn, bucket]) => {
@@ -330,7 +338,9 @@ function prepNotices(input: {
     if (!text) return [];
     return [{ mealId: input.mealId, showOn, text }];
   });
-  return [...thawNotices, ...other];
+  return [...thawNotices, ...other].sort(
+    (a, b) => a.showOn.localeCompare(b.showOn) || a.text.localeCompare(b.text),
+  );
 }
 
 function noticeText(input: {
@@ -364,10 +374,19 @@ function surfaceDate(when: Date, timeZone: string): string {
   return date;
 }
 
-/** A lead of a day or more stays on the calendar day it starts. Shorter leads still move before 9 AM to the previous evening. */
-function aheadSurfaceDate(when: Date, timeZone: string, leadMinutes: number): string {
-  if (leadMinutes >= 24 * 60) return zonedIsoDate(when, timeZone);
-  return surfaceDate(when, timeZone);
+/**
+ * Days a step should appear. A lead of a day or more stays on the calendar day it starts.
+ * If that instant is before 9 AM, the previous evening gets a card too.
+ * Shorter leads still move a pre-9 AM start to the previous evening only.
+ */
+function aheadShowDates(when: Date, timeZone: string, leadMinutes: number): string[] {
+  const startDay = zonedIsoDate(when, timeZone);
+  if (leadMinutes >= 24 * 60) {
+    const dates = [startDay];
+    if (zonedParts(when, timeZone).hour < EARLY_START_HOUR) dates.push(addDays(startDay, -1));
+    return dates;
+  }
+  return [surfaceDate(when, timeZone)];
 }
 
 function thawNoticeText(title: string, dinnerDate: string): string {
@@ -453,12 +472,11 @@ function inferredThawSteps(input: {
 }): AheadStep[] {
   const blob = `${input.title}\n${input.steps.join("\n")}`;
   if (!isThawText(blob)) return [];
-  const thawLines = input.steps.filter(isThawText);
 
   let explicit: number | null = null;
-  for (const step of thawLines) {
-    const minutes = minutesFromPhrase(step);
-    if (minutes != null && minutes >= 60 && (explicit == null || minutes > explicit)) explicit = minutes;
+  for (const text of [input.title, ...input.steps]) {
+    const minutes = thawSpanMinutes(text);
+    if (minutes != null && (explicit == null || minutes > explicit)) explicit = minutes;
   }
   const thawMinutes = explicit ?? fridgeThawMinutes(input.title, input.steps);
   return [
@@ -467,6 +485,27 @@ function inferredThawSteps(input: {
       leadMinutes: thawMinutes + nonNegative(input.cookMinutes) + nonNegative(input.restMinutes),
     },
   ];
+}
+
+/** Hours tied to thaw, fridge, or defrost — or a bare span of at least ~6h. Salt and rest times do not count. */
+function thawSpanMinutes(text: string): number | null {
+  let best: number | null = null;
+  for (const sentence of text.split(/[\n.;]+/)) {
+    const minutes = minutesFromPhrase(sentence);
+    if (minutes == null || !isThawSpan(sentence, minutes)) continue;
+    if (best == null || minutes > best) best = minutes;
+  }
+  return best;
+}
+
+function isThawSpan(sentence: string, minutes: number): boolean {
+  const thawOrDefrost = /\b(thaw|defrost)\b/i.test(sentence);
+  const prepAside = /\b(salt|season|rest|sit)\b/i.test(sentence);
+  const cookVerb = /\b(smoke|smoker|roast|braise|cook|simmer|bake|grill|oven|sear)\b/i.test(sentence);
+  if (prepAside && !thawOrDefrost) return false;
+  if (cookVerb && !thawOrDefrost && !/\bfridge\b/i.test(sentence)) return false;
+  if (thawOrDefrost || /\bfridge\b/i.test(sentence)) return true;
+  return minutes >= MIN_BARE_THAW_MINUTES;
 }
 
 /** Steaks 36h, large roasts and pork butt 48h, brisket 72h. Unknown frozen meat uses the steak window. */
@@ -479,9 +518,8 @@ export function fridgeThawMinutes(title: string, steps: readonly string[]): numb
 }
 
 function isThawText(text: string): boolean {
-  if (/\bthaw/i.test(text)) return true;
-  if (/\bfreezer\b/i.test(text)) return true;
-  if (/\bfrozen\b/i.test(text) && (MEAT_CUT.test(text) || FROZEN_PROTEIN.test(text))) return true;
+  if (/\b(thaw|defrost|freezer)\b/i.test(text)) return true;
+  if (/\bfrozen\b/i.test(text)) return true;
   return false;
 }
 
